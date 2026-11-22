@@ -42,35 +42,24 @@ class OccupancyGaussian:
 # 2. Analytic pairwise integrals
 # ---------------------------------------------------------------------------
 def _product_gaussian(g1: OccupancyGaussian, g2: OccupancyGaussian):
-    """Product of two gaussians is a gaussian. Return (weight, cov, mean)."""
-    S = g1.cov + g2.cov
-    S_inv = np.linalg.inv(S)
-    d = g1.pos - g2.pos
-    # weight: (2pi)^-3/2 * |S1*S2/S|^1/2 * exp(-0.5 d^T (S1^-1+S2^-1) d)
-    # simpler: integral g1*g2 = N(0; 0, S1+S2) evaluated... derive:
-    # g1(x)g2(x) = A exp(-0.5(x-m1)^T A1 (x-m1) - 0.5(x-m2)^T A2 (x-m2))
-    # = A exp(-0.5 (x-m)^T (A1+A2) (x-m) - 0.5 m1^T A1 m1 - 0.5 m2^T A2 m2 + 0.5 m^T(A1+A2)m)
+    """Product of two gaussians is a gaussian. Return (weight, precision, mean)."""
     A = g1.cov_inv + g2.cov_inv
     m = np.linalg.solve(A, g1.cov_inv @ g1.pos + g2.cov_inv @ g2.pos)
     quad = (0.5 * g1.pos @ g1.cov_inv @ g1.pos
             + 0.5 * g2.pos @ g2.cov_inv @ g2.pos
             - 0.5 * m @ A @ m)
     w = np.exp(-quad)
-    # normalization: each gaussian integrates to 1 over R^3 with
-    #   (2pi)^-3/2 |cov|^-1/2, so product integrates to
-    #   (2pi)^-3/2 |A|^-1/2 * w
     norm = (2 * np.pi) ** -1.5 * np.sqrt(np.linalg.det(A))
     return w * norm, A, m
 
 
 def pairwise_overlap(g1: OccupancyGaussian, g2: OccupancyGaussian) -> float:
-    """Integral of g1*g2 over R^3 (dimensionless overlap mass)."""
+    """Integral of g1*g2 over R^3 (dimensionless overlap)."""
     w, _, _ = _product_gaussian(g1, g2)
     return w
 
 
 def pairwise_mass(g1: OccupancyGaussian, g2: OccupancyGaussian) -> float:
-    """Mass-coupling integral: mass1*mass2 * overlap."""
     return g1.mass * g2.mass * pairwise_overlap(g1, g2)
 
 
@@ -81,30 +70,39 @@ def _E_nu_to_lame(E: float, nu: float):
 
 
 def pairwise_stiffness(g1: OccupancyGaussian, g2: OccupancyGaussian) -> np.ndarray:
-    """3x3 stiffness coupling between two gaussians from a simple
-    neo-Hookean-ish strain energy on the overlap region.
+    """3x3 stiffness coupling using anisotropic scales and proper overlap.
 
-    Model: treat the overlap as a soft spring whose rest length is the
-    sum of the 'radii' along the line of centers, with stiffness set by
-    the effective Young's modulus of the pair and the overlap volume.
-    This is a Phase-0 surrogate — replace with full analytic strain
-    integrals later without changing the API.
+    Approximates the linear elastic interaction energy in the product-Gaussian
+    region. Uses Lamé parameters and a direction-dependent effective modulus
+    that accounts for the covariance of both kernels (not pure isotropic spring).
     """
     d = g2.pos - g1.pos
     dist = np.linalg.norm(d) + 1e-12
     n = d / dist
-    r1 = np.mean(g1.scale)
-    r2 = np.mean(g2.scale)
-    overlap_vol = pairwise_overlap(g1, g2) * (2 * np.pi) ** 1.5 * np.prod(np.sqrt(g1.cov.diagonal() * g2.cov.diagonal()) / np.sqrt((g1.cov + g2.cov).diagonal()))
-    # effective modulus
-    E_eff = 2 * g1.E * g2.E / (g1.E + g2.E + 1e-12)
-    # spring constant ~ E_eff * overlap_area / overlap_length
-    k = E_eff * overlap_vol ** (2 / 3) / (r1 + r2 + 1e-12)
-    # rest length
+
+    # Effective radii along the line of centers (quadratic form of cov)
+    r1 = np.sqrt(n @ g1.cov @ n)
+    r2 = np.sqrt(n @ g2.cov @ n)
     L0 = r1 + r2
-    # force = k * (dist - L0) * n for dist > L0 (compression only in Phase 0)
-    # stiffness matrix in 3D: k * n n^T
-    K = k * np.outer(n, n)
+
+    overlap = pairwise_overlap(g1, g2)
+    # Approximate overlap volume scale
+    vol_scale = overlap * (2 * np.pi) ** 1.5 * np.sqrt(np.linalg.det(g1.cov) * np.linalg.det(g2.cov) / np.linalg.det(g1.cov + g2.cov))
+
+    lam1, mu1 = _E_nu_to_lame(g1.E, g1.nu)
+    lam2, mu2 = _E_nu_to_lame(g2.E, g2.nu)
+    # harmonic mean of moduli
+    mu_eff = 2 * mu1 * mu2 / (mu1 + mu2 + 1e-12)
+    lam_eff = 2 * lam1 * lam2 / (lam1 + lam2 + 1e-12)
+
+    # normal stiffness (volumetric + shear projection)
+    k_n = (lam_eff + 2 * mu_eff) * vol_scale ** (2.0 / 3.0) / (L0 + 1e-12)
+    # tangential (shear) stiffness
+    k_t = mu_eff * vol_scale ** (2.0 / 3.0) / (L0 + 1e-12)
+
+    # stiffness tensor: normal part + isotropic shear in the plane
+    nnT = np.outer(n, n)
+    K = k_n * nnT + k_t * (np.eye(3) - nnT)
     return K
 
 
@@ -119,14 +117,12 @@ def assemble_K_M(gaussians: list[OccupancyGaussian]):
     M = np.zeros((dim, dim))
     for i in range(N):
         ii = slice(3 * i, 3 * i + 3)
-        # self mass
         M[ii, ii] += gaussians[i].mass * np.eye(3)
         for j in range(i + 1, N):
             jj = slice(3 * j, 3 * j + 3)
             Kij = pairwise_stiffness(gaussians[i], gaussians[j])
             K[ii, jj] += Kij
             K[jj, ii] += Kij
-            # off-diagonal mass coupling (small)
             Mij = 0.5 * pairwise_mass(gaussians[i], gaussians[j]) * np.eye(3)
             M[ii, jj] += Mij
             M[jj, ii] += Mij
@@ -139,10 +135,8 @@ def assemble_K_M(gaussians: list[OccupancyGaussian]):
 def modal_analysis(K: np.ndarray, M: np.ndarray, n_modes: int = C.N_MODES):
     """Generalized eigenvalue problem K v = w^2 M v.
     Returns (frequencies Hz, mode shapes)."""
-    # symmetrize
     K = 0.5 * (K + K.T)
     M = 0.5 * (M + M.T)
-    # regularize M to be SPD
     M = M + 1e-9 * np.eye(M.shape[0])
     w2, V = eigh(K, M, subset_by_index=[0, min(n_modes, K.shape[0]) - 1])
     w2 = np.maximum(w2, 0.0)
@@ -165,12 +159,9 @@ def langevin_step(state: State, forces: np.ndarray, dt: float,
     forces: (N, 3) external + contact forces.
     """
     N = state.pos.shape[0]
-    # half-step velocity with force
     a = forces / masses[:, None]
     v_half = state.vel + 0.5 * dt * a
-    # position step
     pos_new = state.pos + dt * v_half
-    # damping + noise on velocity (Ornstein-Uhlenbeck exact)
     c = np.exp(-gamma * dt)
     if T > 0 and gamma > 0:
         sigma = np.sqrt(C.KB * T / masses * (1 - c ** 2))[:, None]
@@ -178,7 +169,6 @@ def langevin_step(state: State, forces: np.ndarray, dt: float,
     else:
         noise = 0.0
     v_new = c * v_half + noise
-    # second half force step at new position is done by caller re-evaluating
     return State(pos_new, v_new)
 
 
@@ -191,12 +181,13 @@ class ContactPair:
     j: int
     normal: np.ndarray
     penetration: float
-    rel_vel: float
+    rel_vel: np.ndarray   # relative velocity vector
 
 
 def contact_pairs(gaussians: list[OccupancyGaussian],
+                  velocities: np.ndarray | None = None,
                   threshold: float = C.PEN_THRESHOLD) -> list[ContactPair]:
-    """Generate contact pairs from gaussian proximity."""
+    """Generate contact pairs from gaussian proximity. velocities: (N, 3)."""
     pairs = []
     N = len(gaussians)
     for i in range(N):
@@ -204,35 +195,48 @@ def contact_pairs(gaussians: list[OccupancyGaussian],
             g1, g2 = gaussians[i], gaussians[j]
             d = g2.pos - g1.pos
             dist = np.linalg.norm(d) + 1e-12
-            r1, r2 = np.mean(g1.scale), np.mean(g2.scale)
+            r1 = np.sqrt(d @ g1.cov @ d) / dist   # projected radius
+            r2 = np.sqrt(d @ g2.cov @ d) / dist
             pen = (r1 + r2) - dist
             if pen > threshold * min(r1, r2):
                 n = d / dist
-                rel = np.dot(g2.pos - g1.pos, n)  # placeholder rel vel
+                if velocities is not None:
+                    rel = velocities[j] - velocities[i]
+                else:
+                    rel = np.zeros(3)
                 pairs.append(ContactPair(i, j, n, pen, rel))
     return pairs
 
 
 def penalty_force(pair: ContactPair, gaussians: list[OccupancyGaussian],
                   mu: float = C.FRICTION_MU) -> tuple[np.ndarray, np.ndarray]:
-    """Normal + friction penalty forces on bodies i and j."""
+    """Normal penalty + Coulomb friction from tangential relative velocity."""
     gi, gj = gaussians[pair.i], gaussians[pair.j]
-    # normal stiffness from pairwise
     Kij = pairwise_stiffness(gi, gj)
-    k_n = np.trace(Kij) / 3.0
-    f_n = k_n * pair.penetration
-    f_i = -f_n * pair.normal
-    f_j = +f_n * pair.normal
-    # simple coulomb friction opposing tangential relative velocity
-    # (Phase 0: no tangential state, just a damping-like term)
-    return f_i, f_j
+    # normal stiffness projected
+    k_n = float(pair.normal @ Kij @ pair.normal)
+    f_n_mag = k_n * max(pair.penetration, 0.0)
+    f_n = f_n_mag * pair.normal
+
+    # tangential relative velocity
+    v_rel = pair.rel_vel
+    v_n = np.dot(v_rel, pair.normal) * pair.normal
+    v_t = v_rel - v_n
+    vt_norm = np.linalg.norm(v_t) + 1e-12
+
+    # Coulomb friction opposing tangential velocity
+    f_t_mag = mu * f_n_mag
+    f_t = -f_t_mag * (v_t / vt_norm)
+
+    f_total = f_n + f_t
+    # equal and opposite
+    return -f_total, +f_total
 
 
 # ---------------------------------------------------------------------------
 # 7. Evaluation harness
 # ---------------------------------------------------------------------------
 def eval_energy_drift(traj_ke: list[float], traj_pe: list[float], dt: float) -> float:
-    """Total energy drift per second."""
     if len(traj_ke) < 2:
         return 0.0
     E = [k + p for k, p in zip(traj_ke, traj_pe)]
@@ -243,7 +247,6 @@ def eval_energy_drift(traj_ke: list[float], traj_pe: list[float], dt: float) -> 
 
 def eval_penetration(pairs_hist: list[list[ContactPair]],
                      gaussians: list[OccupancyGaussian]) -> float:
-    """Max penetration as fraction of gaussian scale."""
     worst = 0.0
     for pairs in pairs_hist:
         for p in pairs:
@@ -270,14 +273,12 @@ def scene_harmonic_oscillator():
     state = State(pos=g.pos.copy()[None, :], vel=np.zeros((1, 3)))
     traj_pos, traj_ke, traj_pe = [], [], []
     for step in range(2000):
-        # harmonic force
         f = -k * state.pos
         state = langevin_step(state, f, C.DT, np.array([m]), T=0.0, gamma=1e-6)
         traj_pos.append(state.pos[0].copy())
         traj_ke.append(0.5 * m * np.sum(state.vel ** 2))
         traj_pe.append(0.5 * k * np.sum(state.pos ** 2))
     pos = np.array(traj_pos)
-    # analytic reference: x(t) = x0 cos(wt) with x0=1
     t = np.arange(len(pos)) * C.DT
     ref = np.cos(omega * t)
     err = np.mean(np.abs(pos[:, 0] - ref))
@@ -301,24 +302,20 @@ def scene_two_body_contact():
     masses = np.array([g.mass for g in gs])
     traj_ke, traj_pe, pairs_hist = [], [], []
     for step in range(3000):
-        pairs = contact_pairs(gs)
+        pairs = contact_pairs(gs, velocities=state.vel)
         pairs_hist.append(pairs)
         F = np.zeros((2, 3))
         for p in pairs:
             fi, fj = penalty_force(p, gs)
             F[p.i] += fi
             F[p.j] += fj
-        # also soft spring toward each other via K
-        K, M = assemble_K_M(gs)
-        # external: none; contact forces already in F
         state = langevin_step(state, F, C.DT, masses, T=0.0, gamma=1e-6)
-        # sync gaussian positions
         for i in range(2):
             gs[i].pos = state.pos[i]
         ke = 0.5 * np.sum(masses[:, None] * state.vel ** 2)
         pe = 0.0
         for p in pairs:
-            pe += 0.5 * np.trace(pairwise_stiffness(gs[p.i], gs[p.j])) * p.penetration ** 2
+            pe += 0.5 * float(p.normal @ pairwise_stiffness(gs[p.i], gs[p.j]) @ p.normal) * p.penetration ** 2
         traj_ke.append(ke)
         traj_pe.append(pe)
     drift = eval_energy_drift(traj_ke, traj_pe, C.DT)
