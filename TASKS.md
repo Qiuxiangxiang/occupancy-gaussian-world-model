@@ -19,30 +19,31 @@ Dates: M1 finished Sunday 2026-11-22 PST / Monday 2026-11-23 UTC. Saturday Nov 2
 M1 explicitly not done, and not claimed:
 
 - [ ] Per-frame 3DGS conversion or a splat timer
-- [ ] Rigid bodies, hinges, embedded supports, mode identity
+- [ ] Rigid bodies and hinges (embedded support and mode identity are M2, not M1)
 - [ ] Inverting Young's modulus from the trajectory
 
-## M2 — embedded supports (not started)
+## M2 — embedded supports (done)
 
-Depends on M1's surface event log.
+Decision, because the repo did not define it: rooted set is frozen at compile from kind `embedded`, `embedded_indices` / `embedded_objects`, and an optional ground plane. Energy is `1/2 k ||M (x-x_rest)||^2` on translational DOFs. See `PLAN.md`.
 
-- [ ] Define rooted set and the support energy (missing from the repo; do not invent it silently)
-- [ ] Activate that constraint at step 0 and on every later step, including steps with an empty contact set
-- [ ] Track eigenmodes through permutation, sign, and near ties
-- [ ] Compare the tracked embedded spectrum with the M1 surface trace
-- [ ] Test that a persistent constraint stays in the active set with no collision
-- [ ] Report smoothness only for states that are actually continuous. M1 already shows `contact_off` with almost no frequency change (`39.74 → 46.02 Hz` at contact on, `46.02 → 46.01 Hz` at contact off)
+- [x] `compiler/embedded_support.py` and compile-time wiring
+- [x] Active at step 0 with zero force at the rest pose, and still active with an empty contact set (`tests/test_embedded_support.py`)
+- [x] `compiler/mode_tracking.py`: permutation, sign, near-degenerate Procrustes (`tests/test_mode_tracking.py`)
+- [x] Embedded coast versus M1 surface `run_contact` (`compiler/m2_study.py`, `artifacts/m2_report.json`, `tests/test_m2_embedded.py`)
+- [x] Smooth only for the continuous coast (max step relative change `1.06e-4` over `0.2 s`). A `0.8 m` jump relative change is `0.883`
+- [x] Surface contact_on relative change `0.158`; contact_off relative change `2.67e-4` (quiet, same fact as M1)
 
-## M3 — three topology axes (not started)
+## M3 — topology axes (not started)
 
-Depends on M1's pair log. Participation also depends on M2's mode tracks.
+Depends on M1's pair log. Identity tracking from M2 does not by itself define participation.
 
 - [ ] Write the axis glossary in tests before adding physics: active-set bit, normal complementarity, material incompressibility, persistent embed, tangential stick/slip
 - [ ] Choose units, thresholds, and hysteresis, or record them as still open
 - [ ] Replay tests for the chosen schema
 - [ ] Do not add a friction model beyond `penalty_force`. M1 conservation uses `mu=0`
+- [ ] Modal participation is still open. Tracking exists; excitation weights do not
 
-Underdetermined until that glossary exists. M1's predicate has no hysteresis.
+Underdetermined until that glossary exists. M1's predicate has no hysteresis. M2's support is not a contact bit.
 
 ## M4 — 1D modulus inversion (not started)
 
@@ -112,6 +113,9 @@ M1 does not change these limits. Conservation runs pass `T=0`, `gamma=0`, `mu=0`
 - [x] `tests/test_scene_compiler.py`
 - [x] `tests/test_incremental_contact.py`
 - [x] `tests/test_m1_gates.py`
+- [x] `tests/test_embedded_support.py`
+- [x] `tests/test_mode_tracking.py`
+- [x] `tests/test_m2_embedded.py`
 
 Commands that match this status:
 
@@ -120,4 +124,7 @@ python -c "import tests.test_harmonic as a, tests.test_contact as b, tests.test_
 python -c "import tests.test_scene_compiler as t; t.main()"
 python -c "import tests.test_incremental_contact as t; t.main()"
 python -m compiler.harness
+python -c "import tests.test_embedded_support as t; t.main()"
+python -c "import tests.test_mode_tracking as t; t.main()"
+python -m compiler.m2_study
 ```

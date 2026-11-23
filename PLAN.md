@@ -50,16 +50,34 @@ Known M1 limits:
 - Legacy `scene_two_body_contact` still simulates `0.3 s` from a `2 m` gap and records zero contacts. It is not the M1 gate.
 - Mesh import is not implemented. The perception stub still does not reconstruct from images.
 
-## M2 — embedded supports (not started)
+## M2 — embedded supports (done in this branch)
 
-Depends on M1's surface log as the comparison trace. Can be designed before M1's numbers, but there is no embedded constraint in this branch.
+The repo never named a rooted set or a support energy. The rule that is implemented, and frozen at compile time, is the union of:
 
-Open before any code claims success:
+- boundary kind `embedded`
+- `embedded_indices` / `embedded_objects`
+- centers on the support side of an optional `ground_plane` (`normal · x <= offset`)
 
-- Which gaussians are rooted, and what the support energy is. The repo does not define it.
-- The constraint has to be active at initialization and on every later step, including frames with no collision.
-- Mode tracking under permutation, sign flips, and near-repeated frequencies. M1 only stores sorted eigenvalues.
-- Compare that tracked spectrum with the M1 surface trace. The contact-off sample above is already evidence that a surface event can be spectrally quiet.
+Later motion does not add or remove members. A surface contact does not create a support.
+
+Energy, for each rooted gaussian, on the translational DOFs Phase 0 stores (there is no rotational DOF):
+
+`E = 1/2 k || M (x - x_rest) ||^2` joules, `F = -k M (x - x_rest)` newtons, with `x` in meters and `k` in N/m. `M` is a 0/1 mask, default all three axes. `k` is `support_stiffness` when the sidecar sets it, otherwise `E_young * mean(scale)` (Pa·m = N/m). That product is a default, not a calibration. `x_rest` is the compiled position.
+
+The force is added on every evaluation passed to `langevin_step`, including the second kick, from step 0. At the rest pose the force and energy are zero and the stiffness is still in a copy of `K` (`add_to_stiffness` after `assemble_K_M`; that function is not edited). `apply_boundary_conditions` does not move these bodies. A fixed boundary remains a Dirichlet reset and is not this support.
+
+Measured by `python -m compiler.m2_study` into `artifacts/m2_report.json`. Seed is null. No RNG draw. Mass basis for both runs is `integrator_diagonal_mass` because the coupled mass is indefinite, the same condition as M1.
+
+Embedded regime: rooted mass `1 kg`, free mass `1 kg`, `k = 5000 N/m`, `dt = 1e-4 s`, 2000 steps, horizon `0.2 s`. The free body coasts from `0.16 m` toward the root and stops near `0.14 m`, outside the `0.10 m` contact distance. Contact steps: `0`. Support evaluations: `4001` (the residual at step 0 plus both kicks of every step). Indices stay `[0]`. Full contact rebuilds: `0`.
+
+Tracked nonzero frequencies (Rayleigh, identity tracked) move from `42.807 / 79.066 Hz` to `51.977 / 96.409 Hz`. Total relative change about `0.219`. Largest single-step relative change about `1.06e-4`. A teleport of the free body to `0.8 m` changes the tracked frequencies by about `0.883` in one step and drops the minimum overlap to about `0.71`. Smoothness is this continuous coast, not a property of every pose change.
+
+Surface baseline is a fresh `run_contact` (M1 path, sorted eigenvalues, identity not tracked):
+
+- contact on at `0.1001 s`: `39.737 / 74.341 Hz` to `46.020 / 86.095 Hz`, relative change `0.158`
+- contact off at `0.1042 s`: to `46.008 / 86.072 Hz`, relative change `2.67e-4`
+
+The off event remains spectrally quiet. The on event is much larger than one embedded smooth step. Mode identity for the embedded run uses overlap in the mass inner product, Hungarian assignment, and a Procrustes rotation inside frequency clusters closer than `0.01 Hz + 0.1%`. Sign flips and subspace rotations are recorded. M1's own log is left as `not_tracked`.
 
 ## M3 — topology axes (not started; definitions underdetermined)
 
@@ -72,7 +90,7 @@ Do not implement these as if they were already specified:
 - Material incompressibility: `nu` is a Lamé input. Nothing switches a volume constraint when `nu` approaches `0.5`.
 - Persistent embedded supports: M2, and not the same object as a collision contact.
 - Tangential sliding / sticking / separation: `penalty_force` can add Coulomb friction along the current tangent, but M1's conservation run sets `mu=0` and the log does not classify stick versus slip. No new friction law should be invented to fill the axis.
-- Modal participation: which eigenmodes a contact excites. Blocked on M2's identity tracking. Sorting is not participation.
+- Modal participation: which eigenmodes a contact excites. Identity tracking now exists for M2; participation is still not computed. Sorting is not participation.
 
 Units, thresholds, hysteresis, and ids for those axes are decisions, not code yet. M1 ids are `"{i}-{j}"` with stable indices and `seq` as the replay key.
 
@@ -125,6 +143,7 @@ Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignor
 ### Phase 1 — multi-object scenes
 
 - [x] Surface-contact initial conditions from a Cross3DGS cloud (M1)
+- [x] Embedded quadratic support, frozen at compile, active with an empty contact set (M2)
 - [ ] P1-1 Cup + lamp hinge
 - [ ] P1-2 Rigid reduction
 - [ ] P1-3 Non-penetration iteration inside the step

@@ -1,8 +1,9 @@
 """Chronological event log shared by the contact graph and the M1 harness.
 
-M1 records contact-topology changes and modal spectra. It does not classify
-normal/tangential/modal-participation axes (M3) and it does not track
-eigenmode identity across permutations (M2).
+M1 records contact-topology changes and sorted modal spectra (`mode_identity`
+is `not_tracked`). M2 appends embedded-support records and, in its own study,
+tracked Rayleigh frequencies. This log does not classify normal, tangential,
+or modal-participation axes (M3).
 """
 from __future__ import annotations
 
