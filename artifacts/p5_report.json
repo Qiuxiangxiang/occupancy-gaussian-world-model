@@ -76,5 +76,22 @@
   "g5c_render_smoke": {
     "passed": true,
     "note": "render-side smoke not run (remote off); stride decimation is rendering-only, no dynamics claim"
+  },
+  "g5d_dynamics_lod_equivalence": {
+    "passed": true,
+    "failures": [],
+    "horizon_s": 0.4,
+    "approach_speed_each": 0.1,
+    "contact_steps": {
+      "fine": 40,
+      "coarse": 57
+    },
+    "cm_deviation_max_per_body_m": [
+      0.00016946898755507145,
+      0.00016946898755507145
+    ],
+    "cm_deviation_tolerance_m": 0.004000000000000001,
+    "tolerance_basis": "5% of total cm travel, recorded decision",
+    "mass_relative_error": 0.0
   }
 }

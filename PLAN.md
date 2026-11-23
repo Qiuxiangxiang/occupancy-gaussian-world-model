@@ -241,8 +241,24 @@ Two findings reshaped the scope, both recorded rather than hidden:
    design (the 64-grid ladder stalls at 8). This is honest geometry, not a
    bug; rigid reduction (P1-2) is what would change it.
 
+P1-2 landed the same day (`compiler/rigid.py`): rigid reduction by post-step
+projection — members keep rest offsets from the group's cm, linear momentum
+exact, internal KE removed at each projection (the recorded rigid-body
+approximation; no rotational DOF exists to model). Regression anchor kept:
+the unbonded 0.01 m-overlapped pair separates within 19 steps; bonded, it
+holds separation to 1e-12 over 4000 steps.
+
+With rigid reduction, dynamics-level LOD equivalence (G5d) is unblocked and
+passing: a two-body rigid fine scene vs its moment-merged coarse version
+collide under the M1-style approach; per-body cm trajectories deviate by at
+most 0.17 mm against a recorded 4 mm tolerance (5% of travel), contact
+occurs in both, mass is exact. Contact windows differ (40 vs 57 steps) —
+merged 1-sigma reach differs, which is expected geometry, not an error.
+
 Open: render-side decimation smoke (G5c) is scaffolded but not run against
 the 4090 in CI; run it manually when the render path is next exercised.
+Rotation: none — ``OccupancyGaussian`` has no rotational DOF; rigid means
+rigid translation until that changes.
 
 ## Rendering
 

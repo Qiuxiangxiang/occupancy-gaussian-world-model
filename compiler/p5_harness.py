@@ -142,7 +142,8 @@ def run_p5(artifact: Path = ARTIFACT, remote: bool = False) -> dict:
     g5c = {"passed": True, "note": "render-side smoke not run (remote off); "
                                     "stride decimation is rendering-only, no "
                                     "dynamics claim"}
-    failures = g5a["failures"] + g5b["failures"]
+    g5d = _g5d()
+    failures = g5a["failures"] + g5b["failures"] + g5d["failures"]
     report = {
         "phase": "P5",
         "gate": "G5",
@@ -161,6 +162,7 @@ def run_p5(artifact: Path = ARTIFACT, remote: bool = False) -> dict:
         "g5a_merge_invariants": g5a,
         "g5b_policy_on_measured_ladder": g5b,
         "g5c_render_smoke": g5c,
+        "g5d_dynamics_lod_equivalence": g5d,
     }
     artifact.parent.mkdir(parents=True, exist_ok=True)
     artifact.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -168,6 +170,121 @@ def run_p5(artifact: Path = ARTIFACT, remote: bool = False) -> dict:
           f"levels={g5a['count_range']} merges={g5a['merge_count']} "
           f"tight_trace={g5b.get('tight_trace')} -> {artifact}")
     return report
+
+
+def _g5d() -> dict:
+    """Dynamics-level LOD equivalence, unblocked by P1-2 rigid reduction.
+
+    Fine scene: two rigid bodies of two splats each (1-sigma bonded along
+    y, approach along x). Coarse scene: each body replaced by its
+    moment-preserving merge. Both run the same M1-style approach; the
+    comparison is PER-BODY center-of-mass trajectories (whole-scene cm is
+    identically zero by symmetry and proves nothing). The deviation is the
+    measured accuracy cost of the LOD switch — recorded, with contact
+    event preservation, exact mass conservation, and a recorded tolerance
+    (5% of total travel) gated.
+    """
+    from compiler.lod import merge_pair
+    from compiler.rigid import bind_groups, group_cm, project_rigid
+    from occupancy_gaussian_framework import (OccupancyGaussian, State,
+                                              contact_pairs, langevin_step,
+                                              penalty_force)
+    dt = 1.0e-4
+    horizon_s = 0.4
+    speed = 0.1
+    fine = []
+    for body, x0 in (("L", -0.070), ("R", 0.070)):
+        for k, dy in enumerate((-0.045, 0.045)):
+            fine.append(OccupancyGaussian(
+                pos=np.array([x0, dy, 0.0]), scale=np.ones(3) * 0.05,
+                mass=2.36, tag=f"{body}{k}", E=1.0e5, nu=0.3, rho=1200.0))
+    coarse = [merge_pair(fine[0], fine[1]), merge_pair(fine[2], fine[3])]
+    # Body identity for the cross-contact counter: merged tags would both
+    # start with "(" and never compare cross. Restore explicit body tags.
+    coarse[0].tag = "L"
+    coarse[1].tag = "R"
+
+    def simulate(gaussians, rigid_specs):
+        n = len(gaussians)
+        masses = np.array([g.mass for g in gaussians])
+        state = State(pos=np.stack([g.pos.copy() for g in gaussians]),
+                      vel=np.zeros((n, 3)))
+        state.vel[:, 0] = [speed if g.pos[0] < 0 else -speed for g in gaussians]
+        groups = (bind_groups(state.pos, masses, rigid_specs)
+                  if rigid_specs else [])
+        steps = int(round(horizon_s / dt))
+        trace = []
+        contact_steps = 0
+        for _ in range(steps):
+            for i in range(n):
+                gaussians[i].pos = state.pos[i].copy()
+            pairs = contact_pairs(gaussians, velocities=state.vel, threshold=0.0)
+            cross = any(gaussians[p.i].tag[0] != gaussians[p.j].tag[0]
+                        for p in pairs)
+            if cross:
+                contact_steps += 1
+            force = np.zeros((n, 3))
+            for pair in pairs:
+                fi, fj = penalty_force(pair, gaussians, mu=0.0)
+                force[pair.i] += fi
+                force[pair.j] += fj
+
+            def force_fn(pos, vel=state.vel.copy()):
+                for i in range(n):
+                    gaussians[i].pos = np.array(pos[i], dtype=np.float64, copy=True)
+                f = np.zeros((n, 3))
+                for pair in contact_pairs(gaussians, velocities=vel, threshold=0.0):
+                    fi, fj = penalty_force(pair, gaussians, mu=0.0)
+                    f[pair.i] += fi
+                    f[pair.j] += fj
+                return f
+
+            state = langevin_step(state, force, dt, masses, T=0.0, gamma=0.0,
+                                  force_fn=force_fn)
+            if groups:
+                project_rigid(state, masses, groups)
+            if groups:
+                trace.append([group_cm(state, masses, groups[0]),
+                              group_cm(state, masses, groups[1])])
+            else:
+                trace.append([state.pos[0].copy(), state.pos[1].copy()])
+        return trace, contact_steps
+
+    fine_trace, fine_contacts = simulate(
+        [type(g)(pos=g.pos.copy(), scale=g.scale.copy(), mass=g.mass, tag=g.tag,
+                 E=g.E, nu=g.nu, rho=g.rho) for g in fine],
+        [(0, 1), (2, 3)])
+    coarse_trace, coarse_contacts = simulate(
+        [type(g)(pos=g.pos.copy(), scale=g.scale.copy(), mass=g.mass, tag=g.tag,
+                 E=g.E, nu=g.nu, rho=g.rho) for g in coarse],
+        None)
+
+    fine_cm = np.array([[row[0], row[1]] for row in fine_trace])  # (steps, 2, 3)
+    coarse_cm = np.array([[row[0], row[1]] for row in coarse_trace])
+    deviation = np.abs(fine_cm - coarse_cm).max(axis=(0, 2))  # per body
+    travel = 2 * speed * horizon_s
+    failures = []
+    if fine_contacts == 0:
+        failures.append("G5d: fine scene had no contact event")
+    if coarse_contacts == 0:
+        failures.append("G5d: coarse scene had no contact event")
+    mass_fine = sum(g.mass for g in fine)
+    mass_coarse = sum(g.mass for g in coarse)
+    mass_rel = abs(mass_coarse - mass_fine) / mass_fine
+    if mass_rel > 1e-12:
+        failures.append("G5d: mass not conserved by the merge")
+    deviation_tolerance = 0.05 * travel
+    if deviation[0] > deviation_tolerance or deviation[1] > deviation_tolerance:
+        failures.append(
+            f"G5d: per-body cm deviation {deviation.tolist()} m exceeds "
+            f"recorded tolerance {deviation_tolerance:.4f} m")
+    return {"passed": not failures, "failures": failures,
+            "horizon_s": horizon_s, "approach_speed_each": speed,
+            "contact_steps": {"fine": fine_contacts, "coarse": coarse_contacts},
+            "cm_deviation_max_per_body_m": [float(v) for v in deviation],
+            "cm_deviation_tolerance_m": float(deviation_tolerance),
+            "tolerance_basis": "5% of total cm travel, recorded decision",
+            "mass_relative_error": mass_rel}
 
 
 if __name__ == "__main__":

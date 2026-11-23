@@ -151,4 +151,6 @@ python -m compiler.m3_study
 - [x] G5 gate (`compiler/p5_harness.py`): merge invariants over a connected grid pyramid (mass exact, scales finite) + policy replay against the real M5 4090 latency ladder
 - [x] Recorded blocker: dynamics-level LOD needs P1-2 rigid reduction (no attractive bond in the integrator; compound bodies disintegrate)
 - [ ] Render-side decimation smoke against the 4090 (G5c), manual when the render path is next used
-- [ ] Dynamics-level LOD equivalence gates — blocked on P1-2
+- [x] P1-2 rigid reduction (`compiler/rigid.py`): post-step projection onto fixed cm offsets; momentum exact; internal KE removal recorded as the approximation; no rotational DOF
+- [x] Dynamics-level LOD equivalence (G5d): rigid fine vs moment-merged coarse, per-body cm deviation 0.17 mm vs recorded 4 mm tolerance, contact preserved both sides, mass exact
+- [ ] Rotational rigid dynamics — blocked on a rotational DOF existing
