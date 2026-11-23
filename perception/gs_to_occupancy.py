@@ -1,4 +1,10 @@
-"""Perception frontend: 3DGS reconstruction -> occupancy gaussians (Phase 3 stub)."""
+"""Perception frontend.
+
+Phase 3 still owns learned reconstruction (gsplat) and surface resampling.
+An already written Cross3DGS point cloud is imported by ``compiler.scene_compiler``.
+This module does not convert occupancy gaussians back into a point cloud for
+rendering; a frame projects the occupancy gaussians directly.
+"""
 from __future__ import annotations
 import numpy as np
 from occupancy_gaussian_framework import OccupancyGaussian
