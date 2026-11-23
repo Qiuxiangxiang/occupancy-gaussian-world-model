@@ -120,9 +120,9 @@ Depends on a real forward bounce. M1's contact run is that forward path (`langev
 Recorded decisions: log-E parameterization clipped to bounds (positivity by construction); deterministic observation noise at a fixed seed; the initial approach speed is the declared nuisance, estimated jointly with E; six starts (3 E x 2 speed) compared by objective, iteration budget 40 with `converged=False` meaning budget exhausted, not failure. Measured on the M1 forward path (`langevin_step`, not a stand-in): from a 800-step bounce with 1e-4 m noise, recovery lands at 9.71e4 Pa against the simulated 1e5 Pa (2.9% error), nuisance speed 0.200 against 0.200 — better than the order-of-magnitude gate it was scoped to. numpy/scipy only; `invert_friction` stays a Phase 4 stub.')
 
 
-## M5 — telemetry (blocked)
+## M5 — telemetry (done Monday 2026-11-23, RTX 4090)
 
-Not started, and not measurable here.
+Measurable after all: the user's RTX 4090 workstation runs the raster half over Tailscale (`ea-4090-ts`); torch 2.4.1+cu124 + gsplat 1.5.3+pt24cu124 in a venv on the root filesystem (the home filesystem is full). Measured by `python -m compiler.m5_telemetry ea-4090-ts` into `artifacts/m5_report.json` and `artifacts/m5_raster_report.json`.
 
 What was checked:
 
@@ -131,7 +131,7 @@ What was checked:
 - This repository has no occupancy splat rasterizer. M1 forbids a per-frame 3DGS conversion layer, and none was added.
 - The user's GitHub account lists this repository and not a second Cross3DGS checkout. Origin namespaces visible to this run are empty.
 
-No latency or memory number is filled in. A later run needs the same resolution, gaussian count, warmup, repeats, and an explicit CPU-versus-GPU memory definition on hardware that can execute both renderers.
+Filled numbers, with the methodology the blocked note asked for: same exported 100k-gaussian PLY across levels (stride decimation, only count varies), 800x600, warmup 20, repeats 100, seed 0. GPU memory is torch.cuda.max_memory_allocated around the render loop. gsplat on the RTX 4090: 100k gaussians -> 0.482 ms median frame time / 38.6 MB VRAM; 50k -> 0.416 ms / 21.4 MB; 25k -> 0.350 ms / 15.1 MB; 10k -> 0.246 ms / 11.8 MB; 2.5k -> 0.236 ms / 10.2 MB. Frame cost is fixed-overhead dominated below ~10k gaussians; LOD savings in VRAM are roughly linear, in latency they are not. Physics side on this machine: assemble_K_M is O(N^2) in wall time (64 -> 0.34 s, 128 -> 1.36 s, 256 -> 5.47 s) with tracemalloc peak 0.6/2.4/9.4 MB; the integrator step is ~1e-5 s regardless. Still open and unclaimed: an occupancy-versus-3DGS frame comparison — this repository has no occupancy splat rasterizer, and M1 still forbids a per-frame 3DGS conversion layer.
 
 ## Exchange contract (verified)
 

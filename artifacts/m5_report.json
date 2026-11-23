@@ -1,0 +1,118 @@
+{
+  "milestone": "M5",
+  "resolution": [
+    800,
+    600
+  ],
+  "warmup": 20,
+  "repeats": 100,
+  "seed": 0,
+  "same_inputs_across_levels": "stride decimation of one exported PLY; only gaussian count varies",
+  "physics_cpu": [
+    {
+      "gaussians": 64,
+      "assemble_K_M_s": 0.34422900003846735,
+      "integrator_step_s": 6.008349009789526e-06,
+      "assembly_peak_alloc_mb": 0.618619,
+      "machine": "local-cpu",
+      "definition": "wall time single thread; memory via tracemalloc peak"
+    },
+    {
+      "gaussians": 128,
+      "assemble_K_M_s": 1.3570739169954322,
+      "integrator_step_s": 6.789600593037903e-06,
+      "assembly_peak_alloc_mb": 2.366983,
+      "machine": "local-cpu",
+      "definition": "wall time single thread; memory via tracemalloc peak"
+    },
+    {
+      "gaussians": 256,
+      "assemble_K_M_s": 5.4736279580392875,
+      "integrator_step_s": 8.097899262793362e-06,
+      "assembly_peak_alloc_mb": 9.444855,
+      "machine": "local-cpu",
+      "definition": "wall time single thread; memory via tracemalloc peak"
+    }
+  ],
+  "raster_gpu": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "rasterizer": "gsplat",
+    "backend": "3dgs",
+    "seed": 0,
+    "source_ply_total_gaussians": 100000,
+    "memory_definition": "torch.cuda.max_memory_allocated around render loop; reserved via memory_reserved",
+    "levels": [
+      {
+        "gaussians": 100000,
+        "resolution": [
+          800,
+          600
+        ],
+        "latency_ms_median": 0.48230400681495667,
+        "latency_ms_p95": 1.2963839769363403,
+        "latency_ms_min": 0.4679679870605469,
+        "warmup": 20,
+        "repeats": 100,
+        "vram_allocated_mb": 38.56896,
+        "vram_reserved_mb": 52.4288
+      },
+      {
+        "gaussians": 50000,
+        "resolution": [
+          800,
+          600
+        ],
+        "latency_ms_median": 0.41574400663375854,
+        "latency_ms_p95": 1.227776050567627,
+        "latency_ms_min": 0.4034560024738312,
+        "warmup": 20,
+        "repeats": 100,
+        "vram_allocated_mb": 21.434368,
+        "vram_reserved_mb": 50.331648
+      },
+      {
+        "gaussians": 25000,
+        "resolution": [
+          800,
+          600
+        ],
+        "latency_ms_median": 0.35020801424980164,
+        "latency_ms_p95": 1.1673599481582642,
+        "latency_ms_min": 0.33689600229263306,
+        "warmup": 20,
+        "repeats": 100,
+        "vram_allocated_mb": 15.139328,
+        "vram_reserved_mb": 25.165824
+      },
+      {
+        "gaussians": 10000,
+        "resolution": [
+          800,
+          600
+        ],
+        "latency_ms_median": 0.2457599937915802,
+        "latency_ms_p95": 0.39423999190330505,
+        "latency_ms_min": 0.23244799673557281,
+        "warmup": 20,
+        "repeats": 100,
+        "vram_allocated_mb": 11.827712,
+        "vram_reserved_mb": 27.262976
+      },
+      {
+        "gaussians": 2500,
+        "resolution": [
+          800,
+          600
+        ],
+        "latency_ms_median": 0.23555199801921844,
+        "latency_ms_p95": 1.0096640586853027,
+        "latency_ms_min": 0.20070399343967438,
+        "warmup": 20,
+        "repeats": 100,
+        "vram_allocated_mb": 10.176512,
+        "vram_reserved_mb": 23.068672
+      }
+    ]
+  },
+  "open": "No occupancy splat rasterizer exists in this repository; the 3DGS side is measured with gsplat. An occupancy-versus-3DGS frame comparison stays open until an occupancy renderer exists."
+}

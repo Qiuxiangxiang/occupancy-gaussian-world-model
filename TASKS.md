@@ -58,7 +58,16 @@ Depends on the M1 forward contact step.
 
 `inference/inverse_params.py` implements the 1D modulus slice; `invert_friction` remains a Phase 4 stub.
 
-## M5 — telemetry (blocked)
+## M5 — telemetry (done Monday 2026-11-23, on the local RTX 4090 host)
+
+Blocked no more: the user's RTX 4090 workstation (ea-4090-ts, reachable over Tailscale) runs the raster half. Environment: torch 2.4.1+cu124 + gsplat 1.5.3+pt24cu124 in /var/tmp/m5-telemetry (home filesystem /data is full; / has space).
+
+- [x] Same resolution, gaussian count, warmup, repeats, explicit memory definition: 800x600, one exported 100k-gaussian PLY, LOD levels by stride decimation (only count varies), warmup 20, repeats 100, seed 0; GPU memory = torch.cuda.max_memory_allocated around the render loop
+- [x] 3DGS side measured with gsplat on the 4090: 100k -> 0.482 ms median / 38.6 MB VRAM; 2.5k -> 0.236 ms / 10.2 MB (artifacts/m5_report.json); frame cost is fixed-overhead dominated below ~10k gaussians
+- [x] Physics side measured on this machine: assemble_K_M is O(N^2) wall time (256 gaussians = 5.5 s), integrator step ~1e-5 s; memory via tracemalloc peak (ru_maxrss high-water overstates per-scene growth and was rejected)
+- [ ] Occupancy-versus-3DGS frame comparison stays open: this repository still has no occupancy splat rasterizer, and M1 still forbids a per-frame 3DGS conversion layer
+
+## M5 — telemetry (blocked, superseded above)
 
 - [!] Like-for-like 3DGS vs occupancy frame time and memory
 - [!] Connect `ProjectTelemetry` (`android/e2e/.../ProjectTelemetry.kt` in Cross3DGS `d69f79e`) — Android battery/PSS sampler, not a renderer benchmark, and this host has no NVIDIA/Vulkan tool
