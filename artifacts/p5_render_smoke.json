@@ -1,0 +1,38 @@
+{
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "rasterizer": "gsplat",
+  "backend": "3dgs",
+  "resolution": [
+    800,
+    600
+  ],
+  "source_ply_total_gaussians": 100000,
+  "levels": [
+    {
+      "gaussians": 100000,
+      "coverage_nonblack_fraction": 1.0,
+      "frame_value_max": 0.49995025992393494
+    },
+    {
+      "gaussians": 50000,
+      "coverage_nonblack_fraction": 1.0,
+      "frame_value_max": 0.49995025992393494
+    },
+    {
+      "gaussians": 25000,
+      "coverage_nonblack_fraction": 1.0,
+      "frame_value_max": 0.4999502897262573
+    },
+    {
+      "gaussians": 10000,
+      "coverage_nonblack_fraction": 1.0,
+      "frame_value_max": 0.49992531538009644
+    },
+    {
+      "gaussians": 2500,
+      "coverage_nonblack_fraction": 0.9988125,
+      "frame_value_max": 0.48894450068473816
+    }
+  ],
+  "claim": "rendering-side only; no dynamics or equivalence claim"
+}

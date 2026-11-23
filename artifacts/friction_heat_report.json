@@ -1,0 +1,28 @@
+{
+  "mu_0.5": {
+    "mu": 0.5,
+    "dt_s": 0.0001,
+    "steps": 3000,
+    "contact_steps": 41,
+    "kinetic_start_j": 0.11800000000000002,
+    "kinetic_end_j": 0.08921101901469511,
+    "potential_end_j": 0.0,
+    "friction_heat_j": 0.029872415867629617,
+    "closure_residual_j": 0.0010834348823247075,
+    "momentum_drift_max": 0.0,
+    "tangential_rel_speed_end": 0.02124909721349093
+  },
+  "mu_0.0": {
+    "mu": 0.0,
+    "dt_s": 0.0001,
+    "steps": 3000,
+    "contact_steps": 41,
+    "kinetic_start_j": 0.11800000000000002,
+    "kinetic_end_j": 0.11795545177416708,
+    "potential_end_j": 0.0,
+    "friction_heat_j": 0.0,
+    "closure_residual_j": -4.4548225832941046e-05,
+    "momentum_drift_max": 0.0,
+    "tangential_rel_speed_end": 0.2428388315086747
+  }
+}

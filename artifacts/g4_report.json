@@ -1,0 +1,47 @@
+{
+  "gate": "G4",
+  "phase": "P4",
+  "passed": true,
+  "failures": [],
+  "E_true_pa": 100000.0,
+  "E_est_pa": 97184.48664633467,
+  "relative_error": 0.0281551335366533,
+  "stopped_by": "data_exhausted",
+  "windows_used": 6,
+  "estimate_trace_pa": [
+    128402.18996448004,
+    131611.4593140508,
+    99312.5354073081,
+    106880.3200301164,
+    99635.30690464575,
+    97184.48664633467
+  ],
+  "objective_trace": [
+    8.894580491218073e-09,
+    9.75048816975994e-09,
+    9.802713935099912e-09,
+    9.751931328786514e-09,
+    9.776779207400067e-09,
+    9.869633016935407e-09
+  ],
+  "joint_loop": {
+    "passed": true,
+    "failures": [],
+    "E_est_pa": 111800.71955689258,
+    "E_relative_error": 0.11800719556892582,
+    "mu_trace": [
+      0.19837704935652467,
+      0.5700062714145961
+    ],
+    "stopped_by": "budget_exhausted",
+    "windows_used": 2,
+    "identifiability_note": "per-start optima spread is recorded per window; full identifiability is not claimed (glossary)",
+    "optima_spread_last_window": {
+      "logE_std": 1.7020799605839925,
+      "mu_std": 0.28012273417109534,
+      "n_good_starts": 4,
+      "n_starts": 4
+    }
+  },
+  "open": "invert_friction landed as a trajectory-based slice (tests/test_friction_inversion.py): mu is inverted from a sliding collision through the integrator, E fixed. The acoustic route still waits on Phase 2. Joint E+mu closed loops are the next slice."
+}

@@ -1,0 +1,80 @@
+{
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "rasterizer": "gsplat",
+  "backend": "3dgs",
+  "seed": 0,
+  "source_ply_total_gaussians": 100000,
+  "memory_definition": "torch.cuda.max_memory_allocated around render loop; reserved via memory_reserved",
+  "levels": [
+    {
+      "gaussians": 100000,
+      "resolution": [
+        800,
+        600
+      ],
+      "latency_ms_median": 0.48230400681495667,
+      "latency_ms_p95": 1.2963839769363403,
+      "latency_ms_min": 0.4679679870605469,
+      "warmup": 20,
+      "repeats": 100,
+      "vram_allocated_mb": 38.56896,
+      "vram_reserved_mb": 52.4288
+    },
+    {
+      "gaussians": 50000,
+      "resolution": [
+        800,
+        600
+      ],
+      "latency_ms_median": 0.41574400663375854,
+      "latency_ms_p95": 1.227776050567627,
+      "latency_ms_min": 0.4034560024738312,
+      "warmup": 20,
+      "repeats": 100,
+      "vram_allocated_mb": 21.434368,
+      "vram_reserved_mb": 50.331648
+    },
+    {
+      "gaussians": 25000,
+      "resolution": [
+        800,
+        600
+      ],
+      "latency_ms_median": 0.35020801424980164,
+      "latency_ms_p95": 1.1673599481582642,
+      "latency_ms_min": 0.33689600229263306,
+      "warmup": 20,
+      "repeats": 100,
+      "vram_allocated_mb": 15.139328,
+      "vram_reserved_mb": 25.165824
+    },
+    {
+      "gaussians": 10000,
+      "resolution": [
+        800,
+        600
+      ],
+      "latency_ms_median": 0.2457599937915802,
+      "latency_ms_p95": 0.39423999190330505,
+      "latency_ms_min": 0.23244799673557281,
+      "warmup": 20,
+      "repeats": 100,
+      "vram_allocated_mb": 11.827712,
+      "vram_reserved_mb": 27.262976
+    },
+    {
+      "gaussians": 2500,
+      "resolution": [
+        800,
+        600
+      ],
+      "latency_ms_median": 0.23555199801921844,
+      "latency_ms_p95": 1.0096640586853027,
+      "latency_ms_min": 0.20070399343967438,
+      "warmup": 20,
+      "repeats": 100,
+      "vram_allocated_mb": 10.176512,
+      "vram_reserved_mb": 23.068672
+    }
+  ]
+}
