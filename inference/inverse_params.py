@@ -31,12 +31,14 @@ from occupancy_gaussian_framework import (
 SIM_DT = 1.0e-4
 
 
-def simulate_bounce(E, speed, gaussians, *, steps, dt=SIM_DT, masses=None):
+def simulate_bounce(E, speed, gaussians, *, steps, dt=SIM_DT, masses=None,
+                    mu=0.0):
     """Forward path: two-body approach, contact, rebound.
 
-    Mirrors the M1 conservation settings (T=0, gamma=0, mu=0, threshold 0)
-    and the BAOAB second half-kick via force_fn. Returns positions of both
-    bodies at every step, shape (steps, 2, 3).
+    Mirrors the M1 conservation settings (T=0, gamma=0, threshold 0)
+    and the BAOAB second half-kick via force_fn; ``mu`` passes through to
+    the Coulomb term. Returns positions of both bodies at every step,
+    shape (steps, 2, 3).
     """
     pair = [type(g)(pos=g.pos.copy(), scale=g.scale.copy(), mass=g.mass,
                     tag=g.tag, E=float(E), nu=g.nu, rho=g.rho) for g in gaussians]
@@ -51,7 +53,7 @@ def simulate_bounce(E, speed, gaussians, *, steps, dt=SIM_DT, masses=None):
                 pair[i].pos = np.array(pos[i], dtype=np.float64, copy=True)
             force = np.zeros((2, 3))
             for p in contact_pairs(pair, velocities=vel, threshold=0.0):
-                fi, fj = penalty_force(p, pair, mu=0.0)
+                fi, fj = penalty_force(p, pair, mu=mu)
                 force[p.i] += fi
                 force[p.j] += fj
             return force
@@ -127,6 +129,63 @@ def invert_young_modulus(observed_trajectory, gaussians, E_bounds=(1e4, 1e9),
     }
 
 
-def invert_friction(observed_spectrum, gaussians, mu_bounds=(0.0, 1.0)):
-    """Optimize friction coefficient from acoustic spectrum. Stub."""
-    raise NotImplementedError("Phase 4: spectrum matching")
+def invert_friction(observed_trajectory, gaussians, mu_bounds=(0.0, 1.0),
+                    *, steps=None, speed_guess=(0.05, 0.2), E_fixed=1.0e5,
+                    n_mu_inits=3, maxiter=40):
+    """Estimate mu (and the nuisance initial speed) from a sliding
+    collision trajectory, through the real forward model.
+
+    Re-scoped from the Phase 4 stub (see tests/test_friction_inversion.py
+    glossary): spectrum matching waits on Phase 2 acoustics; this slice
+    inverts from trajectory positions like M4 inverts E. E is fixed at
+    ``E_fixed`` for this slice; joint E+mu identifiability is not claimed.
+    """
+    observed = np.asarray(observed_trajectory, dtype=np.float64)
+    if steps is None:
+        steps = observed.shape[0]
+    masses = np.array([g.mass for g in gaussians], dtype=np.float64)
+    mu_lo, mu_hi = float(mu_bounds[0]), float(mu_bounds[1])
+    calls = {"simulations": 0}
+
+    def forward(theta):
+        mu, speed = float(theta[0]), float(theta[1])
+        mu = min(max(mu, mu_lo + 1e-4), mu_hi - 1e-4)
+        speed = max(speed, 1e-6)
+        calls["simulations"] += 1
+        return simulate_bounce(E_fixed, speed, gaussians, steps=steps,
+                               masses=masses, mu=mu)
+
+    def objective(theta):
+        traj = forward(theta)
+        diff = traj - observed
+        return float(np.mean(diff ** 2))
+
+    mu_inits = np.linspace(mu_lo + 0.1 * (mu_hi - mu_lo),
+                           mu_hi - 0.1 * (mu_hi - mu_lo), int(n_mu_inits))
+    starts = [(float(m), float(v0)) for m in mu_inits for v0 in speed_guess]
+    results = []
+    for start in starts:
+        opt = minimize(objective, np.array(start), method="Nelder-Mead",
+                       options={"maxiter": maxiter, "xatol": 1e-3,
+                                "fatol": 1e-16})
+        mu = min(max(float(opt.x[0]), mu_lo), mu_hi)
+        results.append({
+            "mu_init": float(start[0]), "speed_init": float(start[1]),
+            "mu_est": float(mu), "speed_est": float(opt.x[1]),
+            "objective": float(opt.fun),
+            "converged": bool(opt.success),
+        })
+    best = min(results, key=lambda r: r["objective"])
+    return {
+        "mu_est": best["mu_est"],
+        "speed_est": best["speed_est"],
+        "objective": best["objective"],
+        "mu_bounds": [mu_lo, mu_hi],
+        "E_fixed_pa": E_fixed,
+        "nuisance": "initial approach speed, estimated jointly; E fixed",
+        "re_scope": ("spectrum matching deferred to Phase 2 acoustics; "
+                     "trajectory-based inversion through the integrator"),
+        "simulation_calls": calls["simulations"],
+        "parameterization": "mu clipped to bounds (interior epsilon 1e-4)",
+        "starts": results,
+    }

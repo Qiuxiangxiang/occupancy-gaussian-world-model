@@ -53,9 +53,11 @@ def run_g4(artifact: Path = ARTIFACT) -> dict:
               "windows_used": result["windows_used"],
               "estimate_trace_pa": [w["E_est"] for w in result["windows"]],
               "objective_trace": [w["objective"] for w in result["windows"]],
-              "open": ("invert_friction is still a Phase 4 stub; the loop "
-                       "inverts Young's modulus only. Multi-parameter "
-                       "closed loops wait on that slice.")}
+              "open": ("invert_friction landed as a trajectory-based slice "
+                       "(tests/test_friction_inversion.py): mu is inverted "
+                       "from a sliding collision through the integrator, E "
+                       "fixed. The acoustic route still waits on Phase 2. "
+                       "Joint E+mu closed loops are the next slice.")}
     artifact.parent.mkdir(parents=True, exist_ok=True)
     artifact.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"[G4] passed={report['passed']} E_est={result['E_est']:.4e} "
