@@ -1,0 +1,28 @@
+{
+  "gate": "G4",
+  "phase": "P4",
+  "passed": true,
+  "failures": [],
+  "E_true_pa": 100000.0,
+  "E_est_pa": 97184.48664633467,
+  "relative_error": 0.0281551335366533,
+  "stopped_by": "data_exhausted",
+  "windows_used": 6,
+  "estimate_trace_pa": [
+    128402.18996448004,
+    131611.4593140508,
+    99312.5354073081,
+    106880.3200301164,
+    99635.30690464575,
+    97184.48664633467
+  ],
+  "objective_trace": [
+    8.894580491218073e-09,
+    9.75048816975994e-09,
+    9.802713935099912e-09,
+    9.751931328786514e-09,
+    9.776779207400067e-09,
+    9.869633016935407e-09
+  ],
+  "open": "invert_friction is still a Phase 4 stub; the loop inverts Young's modulus only. Multi-parameter closed loops wait on that slice."
+}
