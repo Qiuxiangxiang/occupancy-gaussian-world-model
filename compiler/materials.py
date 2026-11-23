@@ -177,9 +177,9 @@ def amplitude_from_alpha(alpha: float, amp_map: dict) -> dict:
 
 def _boundary(spec: dict, source: str) -> dict:
     kind = str(spec.get("kind", "free"))
-    if kind not in ("free", "fixed", "prescribed_velocity"):
+    if kind not in ("free", "fixed", "prescribed_velocity", "embedded"):
         raise SceneCompileError(
-            f"boundary kind {kind!r} is not free, fixed, or prescribed_velocity"
+            f"boundary kind {kind!r} is not free, fixed, prescribed_velocity, or embedded"
         )
     velocity = spec.get("velocity")
     if kind == "prescribed_velocity":
@@ -190,4 +190,10 @@ def _boundary(spec: dict, source: str) -> dict:
             raise SceneCompileError("prescribed velocity must be three finite numbers")
     else:
         velocity = None
-    return {"kind": kind, "source": source, "velocity": velocity}
+    return {
+        "kind": kind,
+        "source": source,
+        "velocity": velocity,
+        "support_stiffness": spec.get("support_stiffness"),
+        "dof_mask": spec.get("dof_mask"),
+    }

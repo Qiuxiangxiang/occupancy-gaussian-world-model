@@ -24,6 +24,7 @@ from compiler.cross3dgs_ply import (
     cloud_from_activated,
     read_cross3dgs_ply,
 )
+from compiler.embedded_support import build_embedded_supports
 from compiler.errors import SceneCompileError
 from compiler.materials import (
     DISCLAIMER,
@@ -99,6 +100,8 @@ class BoundaryCondition:
     source: str
     anchor: np.ndarray | None = None
     velocity: np.ndarray | None = None
+    support_stiffness: float | None = None
+    dof_mask: tuple | None = None
 
 
 @dataclass
@@ -118,6 +121,7 @@ class CompiledScene:
     occupancy_amplitudes: np.ndarray
     mass_densities: np.ndarray
     young_moduli: np.ndarray
+    supports: object = None
     metadata: dict = field(default_factory=dict)
 
     def density(self, x) -> float:
@@ -138,11 +142,12 @@ class CompiledScene:
     def apply_boundary_conditions(self, state) -> None:
         """Hold fixed anchors and overwrite prescribed velocities.
 
-        A fixed boundary is a Dirichlet condition the sidecar named. It is not
-        an embedded volume support and it is not created by a contact event.
+        A fixed boundary is a Dirichlet reset. An embedded support is not
+        applied here: it is a force and an energy on ``scene.supports``,
+        present from compile time, including when the contact set is empty.
         """
         for bc in self.boundary_conditions:
-            if bc.kind == "free":
+            if bc.kind in ("free", "embedded"):
                 continue
             if bc.kind == "fixed":
                 state.pos[bc.index] = np.array(bc.anchor, dtype=np.float64, copy=True)
@@ -286,6 +291,9 @@ def _compile_cloud(cloud: Cross3DGSCloud, meta: dict, table: dict,
         boundaries.append(BoundaryCondition(
             index=i, kind=boundary["kind"], source=boundary["source"],
             anchor=anchor, velocity=velocity,
+            support_stiffness=None if boundary.get("support_stiffness") is None
+            else float(boundary["support_stiffness"]),
+            dof_mask=None if boundary.get("dof_mask") is None else tuple(boundary["dof_mask"]),
         ))
         amplitudes[i] = amp
         rhos[i] = rho
@@ -317,6 +325,19 @@ def _compile_cloud(cloud: Cross3DGSCloud, meta: dict, table: dict,
             ),
         })
     velocities = _initial_velocities(n, meta.get("initial_velocity"))
+    supports = build_embedded_supports(
+        gaussians, boundaries, object_ids, meta,
+    )
+    for item in provenance:
+        item["embedded_support"] = None
+    for support in supports.supports:
+        provenance[support.index]["embedded_support"] = {
+            "stiffness_N_per_m": support.stiffness_Npm,
+            "dof_mask": support.mask.tolist(),
+            "rest_m": support.rest_m.tolist(),
+            "reasons": list(support.reasons),
+            "active_from_step": 0,
+        }
     any_segmented = any(oid is not None for oid in object_ids)
     scene_meta = {
         "source_format": source_format,
@@ -335,6 +356,8 @@ def _compile_cloud(cloud: Cross3DGSCloud, meta: dict, table: dict,
         "appearance_present": {"f_dc": present_dc, "f_rest": present_rest},
         "exchange_schema": "cross3dgs-ply-SaveGaussianPly",
         "exchange_commit": "d69f79e1431d39d7ba71e22c29065dca67a4b4ce",
+        "embedded_support": "frozen_at_compile" if supports.supports else "none",
+        "embedded_indices": supports.indices(),
     }
     return CompiledScene(
         gaussians=gaussians,
@@ -346,6 +369,7 @@ def _compile_cloud(cloud: Cross3DGSCloud, meta: dict, table: dict,
         occupancy_amplitudes=amplitudes,
         mass_densities=rhos,
         young_moduli=young,
+        supports=supports,
         metadata=scene_meta,
     )
 
