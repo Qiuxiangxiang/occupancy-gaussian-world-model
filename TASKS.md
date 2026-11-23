@@ -142,3 +142,13 @@ python -m compiler.m2_study
 python -c "import tests.test_topology as t; t.main()"
 python -m compiler.m3_study
 ```
+
+## Phase 5 — adaptive LOD (first slice done Monday 2026-11-23)
+
+- [x] LOD pyramid by moment-preserving merges: mass/first/second moment exact, diagonal projection with PSD guard, off-diagonal residual reported per merge (`compiler/lod.py`)
+- [x] Deterministic merge tree: KD-style pairing inside 1-sigma connectivity components; merges never cross gaps; disconnected elements persist; pyramid terminates instead of looping when nothing can merge
+- [x] Budget policy with hysteresis as a pure function (`choose_level`); glossary of record in `tests/test_lod.py`
+- [x] G5 gate (`compiler/p5_harness.py`): merge invariants over a connected grid pyramid (mass exact, scales finite) + policy replay against the real M5 4090 latency ladder
+- [x] Recorded blocker: dynamics-level LOD needs P1-2 rigid reduction (no attractive bond in the integrator; compound bodies disintegrate)
+- [ ] Render-side decimation smoke against the 4090 (G5c), manual when the render path is next used
+- [ ] Dynamics-level LOD equivalence gates — blocked on P1-2

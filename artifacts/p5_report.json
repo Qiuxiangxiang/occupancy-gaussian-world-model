@@ -1,0 +1,80 @@
+{
+  "phase": "P5",
+  "gate": "G5",
+  "passed": true,
+  "failures": [],
+  "blocked": "Dynamics-level LOD (decimating a scene while it simulates) is blocked on P1-2 rigid reduction: the Phase 0 dynamics has no attractive bond \u2014 pair stiffness feeds modal analysis only, never the integrator \u2014 so multi-splat bodies disintegrate and moment-preserving merges of them would diverge immediately. G5 therefore verifies merge invariants, the adaptive policy against real M5 telemetry, and (optionally) a rendering-side decimation smoke with no dynamics claim.",
+  "g5a_merge_invariants": {
+    "passed": true,
+    "failures": [],
+    "levels": [
+      {
+        "level": 0,
+        "gaussians": 64,
+        "mass_relative_error": 0.0
+      },
+      {
+        "level": 1,
+        "gaussians": 32,
+        "mass_relative_error": 3.5800218662412335e-16
+      },
+      {
+        "level": 2,
+        "gaussians": 16,
+        "mass_relative_error": 0.0
+      },
+      {
+        "level": 3,
+        "gaussians": 8,
+        "mass_relative_error": 0.0
+      }
+    ],
+    "count_range": [
+      64,
+      8
+    ],
+    "merge_count": 56,
+    "merge_offdiag_residual_max_m2": 1.982954518374344e-06,
+    "merge_mass_error_max": 0.0,
+    "merge_com_drift_max_m": 3.925231146709438e-17
+  },
+  "g5b_policy_on_measured_ladder": {
+    "passed": true,
+    "failures": [],
+    "ladder_counts": [
+      100000,
+      50000,
+      25000,
+      10000,
+      2500
+    ],
+    "ladder_costs_ms": [
+      0.48230400681495667,
+      0.41574400663375854,
+      0.35020801424980164,
+      0.2457599937915802,
+      0.23555199801921844
+    ],
+    "tight_budget_ms": 0.3,
+    "tight_trace": [
+      0,
+      0,
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ],
+    "loose_trace": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "g5c_render_smoke": {
+    "passed": true,
+    "note": "render-side smoke not run (remote off); stride decimation is rendering-only, no dynamics claim"
+  }
+}

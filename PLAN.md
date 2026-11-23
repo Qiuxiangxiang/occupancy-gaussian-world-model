@@ -190,7 +190,59 @@ Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignor
 
 ### Phase 5 — adaptive LOD
 
-- [ ] Unchanged. Not in the weekly milestones.
+Started Monday 2026-11-23. Design decisions recorded before code (the
+glossary of record is `tests/test_lod.py`):
+
+- Level definition: a LOD pyramid built bottom-up by moment-preserving
+  pairwise merges. Merging two gaussians conserves total mass, first moment
+  (centroid), and second moment exactly; the merged covariance is projected
+  to the diagonal scales Phase 0 actually integrates (M1 limit: world-axis
+  diagonal only). The off-diagonal residual is measured and reported, never
+  silently dropped.
+- Merge tree: deterministic KD-style halving along the longest axis at each
+  node (sorted median split). No RNG, no spatial NN search; the same input
+  always yields the same pyramid.
+- Material fields: E, nu, rho are mass-weighted means of the children;
+  merged mass is the sum. Total scene mass is conserved exactly at every
+  level.
+- What LOD is for: per-frame cost. The M5 latency model (frame cost grows
+  with gaussian count) is the budget input; physics cost (assemble_K_M is
+  O(N^2)) sets a floor on usable counts. Accuracy cost of decimation is
+  measured, not assumed: per-level G5 gates below.
+- Adaptive policy: pick the highest level (most gaussians) whose predicted
+  frame cost fits the budget; switching uses hysteresis — a level change
+  requires the budget condition to be violated or satisfied for K
+  consecutive evaluations (K recorded, default 3). The policy is a pure
+  function of (level costs, budget, current level, streak); no learning.
+- Invariants across a switch: mass conservation is exact by construction;
+  the pre-switch state's coarse representation is re-moment-merged from the
+  fine state at switch time (positions of children updated first), so a
+  switch never invents mass or teleports the centroid.
+
+First slice landed Monday 2026-11-23 (`python -m compiler.p5_harness`,
+artifacts/p5_report.json, G5 passing): merge algebra (moment-preserving
+merges with PSD-guarded diagonal projection, deterministic KD-in-component
+pairing, per-merge diagnostics), the budget policy with hysteresis, and the
+policy wired to the real M5 latency ladder measured on the RTX 4090 (a
+0.30 ms budget settles at the finest measured level that fits, switching
+only after the hysteresis streak).
+
+Two findings reshaped the scope, both recorded rather than hidden:
+
+1. Dynamics-level LOD is BLOCKED on P1-2 rigid reduction. The Phase 0
+   dynamics has no attractive bond — pair stiffness feeds modal analysis
+   only, never the integrator — so a multi-splat "body" is free particles
+   whose internal overlap repels: two splats overlapped by 0.01 m separate
+   within ~19 steps. Moment-preserving merges of such clusters would match
+   at t=0 and diverge immediately. G5 therefore verifies merge invariants
+   and policy behavior without claiming dynamic equivalence across levels.
+2. Connectivity gating can stall the pyramid: merged blobs spaced past
+   their 1-sigma reach disconnect, and disconnected elements persist by
+   design (the 64-grid ladder stalls at 8). This is honest geometry, not a
+   bug; rigid reduction (P1-2) is what would change it.
+
+Open: render-side decimation smoke (G5c) is scaffolded but not run against
+the 4090 in CI; run it manually when the render path is next exercised.
 
 ## Rendering
 
