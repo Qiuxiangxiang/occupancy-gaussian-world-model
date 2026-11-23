@@ -17,7 +17,7 @@
         "dt_s": 0.0004,
         "steps": 500,
         "horizon_s": 0.1996,
-        "mae_m": 2.538622432268767e-10,
+        "mae_m": 2.5386224300483205e-10,
         "energy_drift_per_s": 2.246617165292864e-08,
         "energy_unit": "J",
         "position_unit": "m"
@@ -26,7 +26,7 @@
         "dt_s": 0.0002,
         "steps": 1000,
         "horizon_s": 0.1998,
-        "mae_m": 6.33703249874884e-11,
+        "mae_m": 6.33703245433992e-11,
         "energy_drift_per_s": 5.610918247651444e-09,
         "energy_unit": "J",
         "position_unit": "m"
@@ -35,15 +35,15 @@
         "dt_s": 0.0001,
         "steps": 2000,
         "horizon_s": 0.19990000000000002,
-        "mae_m": 1.5832211597288646e-11,
+        "mae_m": 1.5832211430755194e-11,
         "energy_drift_per_s": 1.4020611696264982e-09,
         "energy_unit": "J",
         "position_unit": "m"
       }
     ],
     "mae_ratios": [
-      4.006011382725247,
-      4.002619886557158
+      4.006011407294819,
+      4.002619900609579
     ]
   },
   "contact": {
@@ -116,7 +116,7 @@
       "mode_identity": "not_tracked",
       "mass_basis": "integrator_diagonal_mass",
       "consistent_mass_spd": false,
-      "consistent_mass_min_eigenvalue": -947.5272904285938,
+      "consistent_mass_min_eigenvalue": -947.5272904285939,
       "reason": "initial",
       "note": "Sorted generalized eigenvalues at this pose. Mode identity across steps is not tracked. A contact event is not required to produce a spectral jump. If the Phase 0 coupled mass is indefinite, the frequencies use the integrator's diagonal masses."
     },

@@ -113,11 +113,12 @@ Example, seed null, from `python -m compiler.m3_study`:
 - `mu = 0.3`: speed 0 `sticking`, 5e-3 m/s `sliding`, 1.5e-3 m/s no event, speed 0 `sticking` again
 - modal force on the 10 Hz tracked mode: excited id `[1]`; the same force on a 0.2 Hz mode: excited `[]`
 
-## M4 — 1D Young's modulus order-of-magnitude inversion (not started)
+## M4 — 1D Young's modulus order-of-magnitude inversion (done Monday 2026-11-23)
 
 Depends on a real forward bounce. M1's contact run is that forward path (`langevin_step`, not a stand-in quadratic). `inference/inverse_params.py` is still the Phase 4 stub.
 
-When it starts: positive or log parameterization, deterministic noise, stated nuisance parameters, more than one initialization, and an error against the modulus that was actually simulated. Stay on numpy/scipy. Do not report a curve fit that never calls the integrator.
+Recorded decisions: log-E parameterization clipped to bounds (positivity by construction); deterministic observation noise at a fixed seed; the initial approach speed is the declared nuisance, estimated jointly with E; six starts (3 E x 2 speed) compared by objective, iteration budget 40 with `converged=False` meaning budget exhausted, not failure. Measured on the M1 forward path (`langevin_step`, not a stand-in): from a 800-step bounce with 1e-4 m noise, recovery lands at 9.71e4 Pa against the simulated 1e5 Pa (2.9% error), nuisance speed 0.200 against 0.200 — better than the order-of-magnitude gate it was scoped to. numpy/scipy only; `invert_friction` stays a Phase 4 stub.')
+
 
 ## M5 — telemetry (blocked)
 

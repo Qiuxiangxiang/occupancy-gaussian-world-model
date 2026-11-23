@@ -47,16 +47,16 @@ Logged switches only. The penalty force is still the instantaneous 1-sigma test.
 
 Not done, and not claimed: complementarity, volumetric incompressibility, a second friction law.
 
-## M4 — 1D modulus inversion (not started)
+## M4 — 1D modulus inversion (done Monday 2026-11-23)
 
 Depends on the M1 forward contact step.
 
-- [ ] Drive `invert_young_modulus` with `langevin_step`, not a quadratic stand-in
-- [ ] Positive or log parameterization, fixed noise seed, declared nuisances
-- [ ] Several initializations and an error against the simulated modulus
-- [ ] Keep numpy/scipy only
+- [x] Drive `invert_young_modulus` with `langevin_step`, not a quadratic stand-in: `inference/inverse_params.py simulate_bounce` is the M1 path (contact_pairs + penalty_force + BAOAB second half-kick, T=0, gamma=0, mu=0); a test counts integrator calls
+- [x] Positive or log parameterization, fixed noise seed, declared nuisances: log E clipped to bounds; observation noise at seed 7/11/3 per test; the initial approach speed is the declared nuisance, estimated jointly with E
+- [x] Several initializations and an error against the simulated modulus: 6 starts (3 E x 2 speed) compared by objective; noisy recovery lands at 9.71e4 Pa vs the simulated 1e5 Pa (2.9% error), speed 0.200 vs 0.200
+- [x] Keep numpy/scipy only
 
-`inference/inverse_params.py` still raises `NotImplementedError`.
+`inference/inverse_params.py` implements the 1D modulus slice; `invert_friction` remains a Phase 4 stub.
 
 ## M5 — telemetry (blocked)
 
