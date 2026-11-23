@@ -2,8 +2,8 @@
 
 M1 records contact-topology changes and sorted modal spectra (`mode_identity`
 is `not_tracked`). M2 appends embedded-support records and, in its own study,
-tracked Rayleigh frequencies. This log does not classify normal, tangential,
-or modal-participation axes (M3).
+tracked Rayleigh frequencies. M3 appends ``constraint_switch`` records
+for debounced normal, tangential, and modal-participation labels.
 """
 from __future__ import annotations
 
