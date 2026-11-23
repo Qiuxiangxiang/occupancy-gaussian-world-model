@@ -1,51 +1,158 @@
 # Implementation Plan
 
-Six phases, 27 tasks, six validation gates.
+Weekly milestones below are the active order. The six-phase list is the original map.
+A target date is not a promise. Status is what is in this branch, not what the calendar hoped.
 
-## Phase 0 — Physics core (no vision)
-- [ ] P0-1 Occupancy gaussian field: density, mass, center of mass
-- [ ] P0-2 Analytic pairwise gaussian integrals (overlap, stiffness, mass)
-- [ ] P0-3 Build global K and M matrices
-- [ ] P0-4 Modal analysis: generalized eigenvalue solve
-- [ ] P0-5 Langevin integrator (velocity Verlet + stochastic term)
-- [ ] P0-6 Symbolic contact layer: pair generation, penalty force
-- [ ] P0-7 Evaluation harness: energy drift, penetration, contacts
-- [ ] P0-8 Demo scene: harmonic oscillator single gaussian
-- [ ] P0-9 Demo scene: two-body contact
-- Gate G0: three validation gates pass
+Clock for this status: M1 landed Sunday 2026-11-22 PST (Monday 2026-11-23 UTC).
+Saturday 2026-11-21 was already past, so M1 is not marked as done on Saturday.
 
-## Phase 1 — Multi-object scenes
-- [ ] P1-1 Cup + lamp scene with hinge constraint on lamp arm
-- [ ] P1-2 Rigid body reduction: lock scales, integrate only rigid modes
-- [ ] P1-3 Non-penetration solver iteration inside Langevin step
-- [ ] P1-4 Energy accounting: kinetic, potential, dissipated heat
-- Gate G1: cup-lamp collision conserves energy within limit
+## M1 — surface import, G0 metrics, event log (done Sunday)
 
-## Phase 2 — Acoustics query
-- [ ] P2-1 Local submatrix extraction per object
-- [ ] P2-2 Frequency + mode shape output API
-- [ ] P2-3 Synthetic sound spectrum from mode superposition
-- Gate G2: cup struck -> audible frequency matches FEM reference
+Dependency order, all done:
 
-## Phase 3 — Perception
-- [ ] P3-1 3DGS reconstruction frontend (gsplat)
-- [ ] P3-2 Convert appearance gaussians -> occupancy gaussians (lock positions to surface samples)
-- [ ] P3-3 Thin-structure recovery (cup handle, lamp shade)
-- Gate G3: reconstruction error isolated from physics error
+1. BAOAB second half-kick so a `T=0`, `gamma=0` step is velocity Verlet. The previous step applied only the first half-kick, so harmonic error did not converge and the legacy G0-1 return was false (MAE about `1.3e-2`, drift about `0.195/s`).
+2. Cross3DGS PLY import and explicit export. Compiler output is an occupancy-gaussian initial condition. The file-domain payload is kept and written back; it is not a per-frame renderer.
+3. Heuristic material table plus per-object and per-gaussian overrides. Appearance does not identify density or Young's modulus.
+4. Incremental contact graph: dirty add/remove/move/scale updates incident edges only. All-pairs and a from-scratch rebuild are oracles for tests.
+5. Harness on compiler-built scenes: harmonic convergence, penetration, energy drift, contact/frequency log.
 
-## Phase 4 — World model (inference + prediction)
-- [ ] P4-1 Forward: state read -> Langevin N steps -> symbolic contact -> render
-- [ ] P4-2 Inverse: estimate Young modulus from bounce trajectory
-- [ ] P4-3 Inverse: estimate friction from acoustic spectrum
-- [ ] P4-4 Visual prediction: render predicted next frame
-- Gate G4: parameter inversion converges from sparse noisy observations
+Measured by `python -m compiler.harness` into `artifacts/m1_report.json`.
+Seed is null. The run draws no RNG. Settings: `T=0 K`, `gamma=0 /s`, friction `mu=0`.
 
-## Phase 5 — Adaptive LOD
-- [ ] P5-1 Split/merge interface with mass-momentum conservation
-- [ ] P5-2 Attention-driven resolution (gaze = render priority)
-- [ ] P5-3 Low-frequency physics retained in periphery
-- Gate G5: no tunneling during gaze shifts; conservation error bounded
+Harmonic, spring `k=4 N/m`, compiled mass about `2.362 kg`, `x0=1 m`, samples at `t=(i+1)*dt`, drift denominator `(n-1)*dt`:
 
-## Notes
-- Phase 0-2 run on CPU; Phase 3+ want a GPU.
-- Keep symbolic layer and continuous layer independently testable at every phase.
+| dt (s) | horizon used (s) | MAE (m) | drift (1/s) |
+| --- | --- | --- | --- |
+| 4e-4 | 0.1996 | 2.539e-10 | 2.247e-8 |
+| 2e-4 | 0.1998 | 6.337e-11 | 5.611e-9 |
+| 1e-4 | 0.1999 | 1.583e-11 | 1.402e-9 |
+
+MAE ratios when the step is halved: about 4.006 and 4.003.
+
+Contact, two surface splats, `dt=1e-4 s`, 4000 steps, drift horizon `0.3999 s`, `E=1e5 Pa` override (not a color guess), `rho=1200 kg/m^3`, amplitude override `1` while visual alpha is `0.5`:
+
+- penetration ratio `0.005223` (dimensionless, `eval_penetration`), limit `PEN_THRESHOLD=0.05`
+- energy drift `1.627e-6 /s`, limit `1e-3 /s`
+- contact on for 41 steps, then off (not a zero-contact run)
+- incremental narrowphase checks `42`, full rebuilds `0`, oracle mismatches `0`
+- one-body probe: 8 bodies, 28 possible pairs, 1 narrowphase check, untouched pairs not rechecked
+
+The penalty is armed at overlap (`threshold=0`). The legacy detector waits until penetration already exceeds 5% of scale, so it cannot be the activation used by a strict `< 0.05` ratio test. The limit itself is unchanged.
+
+Event log (5 records, replay-equal): `modal_spectrum` at `t=0`, `contact_on` at `t=0.1001 s`, spectrum, `contact_off` at `t=0.1042 s`, spectrum. Mode identity is `not_tracked`.
+
+Condition, not a hidden fallback: Phase 0 `pairwise_mass` made the coupled mass indefinite (minimum eigenvalue about `-948` at the start). Logged frequencies use the integrator's diagonal masses. Nonzero frequencies moved from about `39.74/74.34 Hz` at contact-on time's previous sample to `46.02/86.10 Hz` when the contact turned on, and only to `46.01/86.07 Hz` when it turned off. The off event is not a spectral jump: stiffness follows overlap, while the symbolic bit is a threshold. M2 must not assume every surface event jumps, and must not assume an embedded constraint is smooth, until the state under test is actually continuous.
+
+Known M1 limits:
+
+- No object ids in a Cross3DGS PLY, so the gate scene is unsegmented independent particles. Segmentation in a sidecar labels and assigns materials. It does not lock a rigid shape.
+- Diagonal world-axis scales are what Phase 0 integrates. Oriented ellipsoids stay in the exchange quaternion.
+- Legacy `scene_two_body_contact` still simulates `0.3 s` from a `2 m` gap and records zero contacts. It is not the M1 gate.
+- Mesh import is not implemented. The perception stub still does not reconstruct from images.
+
+## M2 — embedded supports (not started)
+
+Depends on M1's surface log as the comparison trace. Can be designed before M1's numbers, but there is no embedded constraint in this branch.
+
+Open before any code claims success:
+
+- Which gaussians are rooted, and what the support energy is. The repo does not define it.
+- The constraint has to be active at initialization and on every later step, including frames with no collision.
+- Mode tracking under permutation, sign flips, and near-repeated frequencies. M1 only stores sorted eigenvalues.
+- Compare that tracked spectrum with the M1 surface trace. The contact-off sample above is already evidence that a surface event can be spectrally quiet.
+
+## M3 — topology axes (not started; definitions underdetermined)
+
+Depends on M1 events and, for the embedded comparison, on M2. The symbolic layer today is the pair set plus the existing penalty.
+
+Do not implement these as if they were already specified:
+
+- Active-set switching: which inequalities are on. M1's `contact_on` / `contact_off` is only that bit for the 1-sigma predicate, with no hysteresis.
+- Non-penetration / normal complementarity: the penalty is not a complementarity solver. Gap, force sign, and feasibility are not logged.
+- Material incompressibility: `nu` is a Lamé input. Nothing switches a volume constraint when `nu` approaches `0.5`.
+- Persistent embedded supports: M2, and not the same object as a collision contact.
+- Tangential sliding / sticking / separation: `penalty_force` can add Coulomb friction along the current tangent, but M1's conservation run sets `mu=0` and the log does not classify stick versus slip. No new friction law should be invented to fill the axis.
+- Modal participation: which eigenmodes a contact excites. Blocked on M2's identity tracking. Sorting is not participation.
+
+Units, thresholds, hysteresis, and ids for those axes are decisions, not code yet. M1 ids are `"{i}-{j}"` with stable indices and `seq` as the replay key.
+
+## M4 — 1D Young's modulus order-of-magnitude inversion (not started)
+
+Depends on a real forward bounce. M1's contact run is that forward path (`langevin_step`, not a stand-in quadratic). `inference/inverse_params.py` is still the Phase 4 stub.
+
+When it starts: positive or log parameterization, deterministic noise, stated nuisance parameters, more than one initialization, and an error against the modulus that was actually simulated. Stay on numpy/scipy. Do not report a curve fit that never calls the integrator.
+
+## M5 — telemetry (blocked)
+
+Not started, and not measurable here.
+
+What was checked:
+
+- Public Cross3DGS commit `d69f79e1431d39d7ba71e22c29065dca67a4b4ce` (2026-11-18). `ProjectTelemetry.kt` is an Android E2E sampler (process PSS, native heap, thermal status, battery). `E2eTelemetry.mm` is the iOS counterpart. Neither is a 3DGS-versus-occupancy frame benchmark.
+- `scripts/benchmark_android.py`, `benchmark_ios.py`, `benchmark_brush.py`, `benchmark_vksplat.py` target devices and other splat runners. This machine has no `nvidia-smi` and no `vulkaninfo`.
+- This repository has no occupancy splat rasterizer. M1 forbids a per-frame 3DGS conversion layer, and none was added.
+- The user's GitHub account lists this repository and not a second Cross3DGS checkout. Origin namespaces visible to this run are empty.
+
+No latency or memory number is filled in. A later run needs the same resolution, gaussian count, warmup, repeats, and an explicit CPU-versus-GPU memory definition on hardware that can execute both renderers.
+
+## Exchange contract (verified)
+
+Writer: `libs/cross3dgs/src/gaussian_state.cpp` `SaveGaussianPly`.
+Check: `tests/cpu/test_ply_export.cpp` (59 floats, `f_rest` channel-major).
+
+- binary little-endian, 59 `float` properties, no normals
+- `opacity` logit, `scale_*` log, `rot_0..3` = `(w, x, y, z)`
+- `f_rest` index `channel * 15 + coefficient`
+- `kShC0 = 0.28209479177387814`
+
+Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignored on read. The writer emits the 59-field header only. Internal `.npz` / dict input must name its conventions; it is not the exchange schema.
+
+## Original phases
+
+### Phase 0 — physics core
+
+- [x] P0-1 Occupancy gaussian field (lumped mass; density of the compiled kernels lives on `CompiledScene.density`)
+- [x] P0-2 Analytic pairwise integrals
+- [x] P0-3 Global K and M
+- [x] P0-4 Modal analysis (`eigh`), with the M1 caveat that coupled M can be indefinite
+- [x] P0-5 Langevin / BAOAB integrator
+- [x] P0-6 Symbolic contact predicate and penalty
+- [x] P0-7 Evaluation harness (`eval_energy_drift`, `eval_penetration`, `eval_contacts`) plus the M1 compiler scenes
+- [x] P0-8 Harmonic demo
+- [x] P0-9 Two-body demo (legacy horizon still misses contact; M1 is the contact gate)
+- [x] Gate G0 on the M1 scenes
+
+### Phase 1 — multi-object scenes
+
+- [x] Surface-contact initial conditions from a Cross3DGS cloud (M1)
+- [ ] P1-1 Cup + lamp hinge
+- [ ] P1-2 Rigid reduction
+- [ ] P1-3 Non-penetration iteration inside the step
+- [ ] P1-4 Full energy split into kinetic, potential, and heat
+- [ ] Gate G1 cup-lamp
+
+### Phase 2 — acoustics
+
+- [x] Minimal `query_frequencies` / placeholder spectrum in `queries/modal_query.py`
+- [ ] Local submatrix per object, tracked modes, audible comparison to a FEM reference
+- [ ] Gate G2
+
+### Phase 3 — perception
+
+- [x] Import of an existing Cross3DGS cloud (this is not reconstruction)
+- [ ] gsplat frontend, surface resampling, thin structures
+- [ ] Gate G3
+
+### Phase 4 — world model
+
+- [ ] Forward closed loop and inverse E / friction (`inference/inverse_params.py`, `loop/closed_loop.py` still raise)
+- [ ] M4 is the 1D modulus slice of P4-2, not the whole phase
+- [ ] Gate G4
+
+### Phase 5 — adaptive LOD
+
+- [ ] Unchanged. Not in the weekly milestones.
+
+## Rendering
+
+Occupancy gaussians are the draw primitive. Do not insert a 3DGS point-cloud conversion on the frame path. `write_cross3dgs_ply` is an explicit export of the file-domain payload.

@@ -1,0 +1,196 @@
+{
+  "milestone": "M1",
+  "seed": null,
+  "determinism": "no RNG; T=0, gamma=0, friction_mu=0; event log replay matches",
+  "rng_consumed": false,
+  "event_replay_equal": true,
+  "harmonic": {
+    "mass_kg": 2.362441251739176,
+    "omega_rad_s": 1.3012162760305124,
+    "x0_m": 1.0,
+    "spring_k_N_per_m": 4.0,
+    "T_K": 0.0,
+    "gamma_per_s": 0.0,
+    "time_base": "sample i is the state after step i, at t=(i+1)*dt",
+    "rows": [
+      {
+        "dt_s": 0.0004,
+        "steps": 500,
+        "horizon_s": 0.1996,
+        "mae_m": 2.538622432268767e-10,
+        "energy_drift_per_s": 2.246617165292864e-08,
+        "energy_unit": "J",
+        "position_unit": "m"
+      },
+      {
+        "dt_s": 0.0002,
+        "steps": 1000,
+        "horizon_s": 0.1998,
+        "mae_m": 6.33703249874884e-11,
+        "energy_drift_per_s": 5.610918247651444e-09,
+        "energy_unit": "J",
+        "position_unit": "m"
+      },
+      {
+        "dt_s": 0.0001,
+        "steps": 2000,
+        "horizon_s": 0.19990000000000002,
+        "mae_m": 1.5832211597288646e-11,
+        "energy_drift_per_s": 1.4020611696264982e-09,
+        "energy_unit": "J",
+        "position_unit": "m"
+      }
+    ],
+    "mae_ratios": [
+      4.006011382725247,
+      4.002619886557158
+    ]
+  },
+  "contact": {
+    "scene": {
+      "source_format": "cross3dgs_ply",
+      "representation": "surface_contact",
+      "shape_dynamics": "unsegmented_independent_particles",
+      "n": 2,
+      "mass_kg": [
+        2.362441251739176,
+        2.362441251739176
+      ],
+      "young_modulus_Pa": [
+        100000.0,
+        100000.0
+      ],
+      "young_modulus_source": [
+        "gaussian_override",
+        "gaussian_override"
+      ],
+      "alpha": [
+        0.5,
+        0.5
+      ],
+      "occupancy_amplitude": [
+        1.0,
+        1.0
+      ],
+      "mass_density_kg_m3": [
+        1200.0,
+        1200.0
+      ],
+      "length_unit": "m",
+      "per_frame_3dgs_conversion": false
+    },
+    "dt_s": 0.0001,
+    "steps": 4000,
+    "horizon_s": 0.39990000000000003,
+    "requested_horizon_s": 0.4,
+    "T_K": 0.0,
+    "gamma_per_s": 0.0,
+    "friction_mu": 0.0,
+    "activation_threshold": 0.0,
+    "penetration_ratio": 0.005223221008032775,
+    "penetration_limit": 0.05,
+    "penetration_definition": "max over logged contacts of penetration / min(mean(scale_i), mean(scale_j)); eval_penetration; dimensionless",
+    "energy_drift_per_s": 1.6267860786386653e-06,
+    "energy_drift_limit_per_s": 0.001,
+    "energy_drift_definition": "|E_end - E_0| / max(|E_0|, 1e-12) / ((n_samples - 1) * dt); E = kinetic + 0.5 * k_n * penetration^2; relative, unit 1/s",
+    "contact_steps": 41,
+    "oracle_mismatches": 0,
+    "narrowphase_checks": 42,
+    "max_checked_pairs_in_a_commit": 1,
+    "full_rebuilds": 0
+  },
+  "event_log": [
+    {
+      "seq": 0,
+      "time_s": 0.0,
+      "kind": "modal_spectrum",
+      "frequencies_hz": [
+        0.0,
+        0.0,
+        0.0,
+        39.73668193006734,
+        39.73668193006734,
+        74.34052473431905
+      ],
+      "ordering": "eigenvalue_ascending",
+      "mode_identity": "not_tracked",
+      "mass_basis": "integrator_diagonal_mass",
+      "consistent_mass_spd": false,
+      "consistent_mass_min_eigenvalue": -947.5272904285938,
+      "reason": "initial",
+      "note": "Sorted generalized eigenvalues at this pose. Mode identity across steps is not tracked. A contact event is not required to produce a spectral jump. If the Phase 0 coupled mass is indefinite, the frequencies use the integrator's diagonal masses."
+    },
+    {
+      "seq": 1,
+      "time_s": 0.10010000000000001,
+      "kind": "contact_on",
+      "i": 0,
+      "j": 1,
+      "pair_id": "0-1"
+    },
+    {
+      "seq": 2,
+      "time_s": 0.10010000000000001,
+      "kind": "modal_spectrum",
+      "frequencies_hz": [
+        0.0,
+        0.0,
+        0.0,
+        46.01993776273496,
+        46.01993776273496,
+        86.09542003379207
+      ],
+      "ordering": "eigenvalue_ascending",
+      "mode_identity": "not_tracked",
+      "mass_basis": "integrator_diagonal_mass",
+      "consistent_mass_spd": false,
+      "consistent_mass_min_eigenvalue": -1473.128249348154,
+      "reason": "contact_topology",
+      "note": "Sorted generalized eigenvalues at this pose. Mode identity across steps is not tracked. A contact event is not required to produce a spectral jump. If the Phase 0 coupled mass is indefinite, the frequencies use the integrator's diagonal masses."
+    },
+    {
+      "seq": 3,
+      "time_s": 0.1042,
+      "kind": "contact_off",
+      "i": 0,
+      "j": 1,
+      "pair_id": "0-1"
+    },
+    {
+      "seq": 4,
+      "time_s": 0.1042,
+      "kind": "modal_spectrum",
+      "frequencies_hz": [
+        0.0,
+        0.0,
+        0.0,
+        46.00766852964398,
+        46.00766852964398,
+        86.07246640048002
+      ],
+      "ordering": "eigenvalue_ascending",
+      "mode_identity": "not_tracked",
+      "mass_basis": "integrator_diagonal_mass",
+      "consistent_mass_spd": false,
+      "consistent_mass_min_eigenvalue": -1471.9484359394473,
+      "reason": "contact_topology",
+      "note": "Sorted generalized eigenvalues at this pose. Mode identity across steps is not tracked. A contact event is not required to produce a spectral jump. If the Phase 0 coupled mass is indefinite, the frequencies use the integrator's diagonal masses."
+    }
+  ],
+  "incremental_probe": {
+    "n_bodies": 8,
+    "n_possible_pairs": 28,
+    "checked_pairs_after_one_move": [
+      [
+        6,
+        7
+      ]
+    ],
+    "narrowphase_checks_for_that_commit": 1,
+    "contact_set_equal": true,
+    "full_rebuilds_on_hot_path": 0,
+    "untouched_pair_rechecked": false
+  },
+  "failures": [],
+  "passed": true
+}
