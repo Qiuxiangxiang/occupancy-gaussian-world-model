@@ -91,13 +91,14 @@ def benchmark_physics(counts: list[int]) -> list[dict]:
     return rows
 
 
-REMOTE_PYTHON = "/var/tmp/m5-telemetry/bin/python"
+REMOTE_PYTHON = "/data/Users/AO/eacomp/liuqinghua/m5/venv/bin/python"
 
 
 def run_remote_raster(ply: Path, levels: list[int], host: str) -> dict | None:
-    # /data (the home filesystem) is full on the target host; / has space.
+    # liuqinghua's convention on this host: his content lives under
+    # /data/Users/AO/eacomp/liuqinghua/ (see AGENTS.md there).
     remote_host, _, remote_path = host.partition(":")
-    remote_path = remote_path or "/var/tmp/occupancy-gaussian-world-model-m5"
+    remote_path = remote_path or "/data/Users/AO/eacomp/liuqinghua/m5/repo"
     sync = subprocess.run(
         ["rsync", "-az", "--exclude", ".git", "--exclude", "__pycache__",
          "--exclude", ".pytest_cache", "-e", "ssh -o BatchMode=yes",
