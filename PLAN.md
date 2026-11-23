@@ -173,8 +173,9 @@ Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignor
 ### Phase 2 — acoustics
 
 - [x] Minimal `query_frequencies` / placeholder spectrum in `queries/modal_query.py`
-- [ ] Local submatrix per object, tracked modes, audible comparison to a FEM reference
-- [ ] Gate G2
+- [x] Local submatrix per object + impact sound (`queries/modal_query.py` rewritten): pair-potential Hessian (recorded finding: Phase 0's reporting K assembles only off-diagonal +Kij and is NOT a potential Hessian — its spectrum is +/- symmetric and relative-motion modes sat in the discarded negative half; M1's numbers remain the M1 record, acoustics uses the Hessian the dynamics integrates). Participation weights w_k = |v_k^T M dv| from the real impact velocity jump — the M3 proposal, now measurement. WAV synthesis (stdlib wave, int16 44.1k, tau 0.05 s recorded decision). G2 gate: real impact -> excited mode 121.8 Hz, synthesized spectral peak 122.0 Hz within 2%, artifacts/g2_impact.wav written.
+- [ ] Audible comparison to a FEM reference: OPEN and recorded — no FEM exists in this repository; the recorded comparison is the sqrt(2) structural anchor between the Phase 0 reporting layer and the pair-potential Hessian (tests/test_acoustics.py)
+- [x] Gate G2 (`compiler/g2_harness.py`, artifacts/g2_report.json)
 
 ### Phase 3 — perception
 

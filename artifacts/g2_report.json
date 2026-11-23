@@ -1,0 +1,30 @@
+{
+  "gate": "G2",
+  "phase": "P2",
+  "passed": true,
+  "failures": [],
+  "wav_artifact": "/Users/liuqinghua/dev/projects/occupancy-gaussian-world-model/artifacts/g2_impact.wav",
+  "impact": {
+    "pre_rel_speed": 0.4,
+    "post_rel_speed": 0.4249194204975157
+  },
+  "modes_hz": [
+    0.0,
+    1.6984349355038097e-07,
+    65.10612132577594,
+    65.10612132577594,
+    121.802399890525
+  ],
+  "negative_clamped_count": 1,
+  "excited_mode_hz": 121.802399890525,
+  "spectral_peak_hz": 122.0,
+  "participation": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+  ],
+  "tau_s": 0.05,
+  "fem_reference": "OPEN: no FEM exists in this repository; the recorded comparison is the sqrt(2) structural anchor to the Phase 0 reporting layer (tests/test_acoustics.py)"
+}
