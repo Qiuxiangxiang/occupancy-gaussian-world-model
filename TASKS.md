@@ -33,17 +33,19 @@ Decision, because the repo did not define it: rooted set is frozen at compile fr
 - [x] Smooth only for the continuous coast (max step relative change `1.06e-4` over `0.2 s`). A `0.8 m` jump relative change is `0.883`
 - [x] Surface contact_on relative change `0.158`; contact_off relative change `2.67e-4` (quiet, same fact as M1)
 
-## M3 — topology axes (not started)
+## M3 — topology axes (done)
 
-Depends on M1's pair log. Identity tracking from M2 does not by itself define participation.
+Logged switches only. The penalty force is still the instantaneous 1-sigma test. Hysteresis is on the symbolic label. ``nu`` is not a switch. See `PLAN.md` for the bands.
 
-- [ ] Write the axis glossary in tests before adding physics: active-set bit, normal complementarity, material incompressibility, persistent embed, tangential stick/slip
-- [ ] Choose units, thresholds, and hysteresis, or record them as still open
-- [ ] Replay tests for the chosen schema
-- [ ] Do not add a friction model beyond `penalty_force`. M1 conservation uses `mu=0`
-- [ ] Modal participation is still open. Tracking exists; excitation weights do not
+- [x] `compiler/topology.py` normal point / area / self-penetration
+- [x] Tangential sticking / sliding only when `mu > 0`; `mu = 0` is `free`
+- [x] Modal participation from tracked columns, score >= 0.20 and frequency >= 1 Hz
+- [x] Embedded support announced once, labeled `embedded_quadratic`, not incompressibility
+- [x] Replay, hysteresis, and one fixture per axis (`tests/test_topology.py`)
+- [x] `compiler/m3_study.py` and `artifacts/m3_report.json`
+- [x] Observer reads `IncrementalContactGraph.active_contacts` and does not rebuild
 
-Underdetermined until that glossary exists. M1's predicate has no hysteresis. M2's support is not a contact bit.
+Not done, and not claimed: complementarity, volumetric incompressibility, a second friction law.
 
 ## M4 — 1D modulus inversion (not started)
 
@@ -116,6 +118,7 @@ M1 does not change these limits. Conservation runs pass `T=0`, `gamma=0`, `mu=0`
 - [x] `tests/test_embedded_support.py`
 - [x] `tests/test_mode_tracking.py`
 - [x] `tests/test_m2_embedded.py`
+- [x] `tests/test_topology.py`
 
 Commands that match this status:
 
@@ -127,4 +130,6 @@ python -m compiler.harness
 python -c "import tests.test_embedded_support as t; t.main()"
 python -c "import tests.test_mode_tracking as t; t.main()"
 python -m compiler.m2_study
+python -c "import tests.test_topology as t; t.main()"
+python -m compiler.m3_study
 ```

@@ -79,20 +79,39 @@ Surface baseline is a fresh `run_contact` (M1 path, sorted eigenvalues, identity
 
 The off event remains spectrally quiet. The on event is much larger than one embedded smooth step. Mode identity for the embedded run uses overlap in the mass inner product, Hungarian assignment, and a Procrustes rotation inside frequency clusters closer than `0.01 Hz + 0.1%`. Sign flips and subspace rotations are recorded. M1's own log is left as `not_tracked`.
 
-## M3 — topology axes (not started; definitions underdetermined)
+## M3 — topology axes (done)
 
-Depends on M1 events and, for the embedded comparison, on M2. The symbolic layer today is the pair set plus the existing penalty.
+"Incompressibility constraint switching" here means an active-set change of a constraint the code already has. It is not a volumetric incompressibility switch. `nu` stays a Lamé parameter. The contact force remains the penalty in `penalty_force`, not a complementarity condition. Every `constraint_switch` sets `volumetric_incompressibility` to false and names its `physics`.
 
-Do not implement these as if they were already specified:
+The instantaneous 1-sigma predicate still decides the force, so G0 is unchanged. The symbolic label uses a Schmitt band and is written only when that label changes. Pair id is `"{i}-{j}"` with `i < j`. Support id is `support:{index}`. `seq` is the log order and the replay key.
 
-- Active-set switching: which inequalities are on. M1's `contact_on` / `contact_off` is only that bit for the 1-sigma predicate, with no hysteresis.
-- Non-penetration / normal complementarity: the penalty is not a complementarity solver. Gap, force sign, and feasibility are not logged.
-- Material incompressibility: `nu` is a Lamé input. Nothing switches a volume constraint when `nu` approaches `0.5`.
-- Persistent embedded supports: M2, and not the same object as a collision contact.
-- Tangential sliding / sticking / separation: `penalty_force` can add Coulomb friction along the current tangent, but M1's conservation run sets `mu=0` and the log does not classify stick versus slip. No new friction law should be invented to fill the axis.
-- Modal participation: which eigenmodes a contact excites. Identity tracking now exists for M2; participation is still not computed. Sorting is not participation.
+Normal axis, penetration ratio = penetration / min(mean scale), dimensionless:
 
-Units, thresholds, hysteresis, and ids for those axes are decisions, not code yet. M1 ids are `"{i}-{j}"` with stable indices and `seq` as the replay key.
+- enter at ratio >= 0.02, release only at ratio <= 0
+- `point`: one logged pair below the area band
+- `area`: ratio >= 0.20, held until ratio < 0.12, or at least two logged pairs between the same object pair
+- `self_penetration`: both ends share a non-null object id. Unsegmented ids do not count
+
+Tangential axis, speed in m/s, same Coulomb term, no second friction model:
+
+- `free` when `mu <= 0` while the normal label is on. Sticking is undefined. This is not called sliding
+- `sticking` when `mu > 0` and speed <= 1e-3 m/s
+- `sliding` when `mu > 0` and speed >= 2e-3 m/s
+- between 1e-3 and 2e-3 the previous stick or slide label stays
+
+Modal axis, on a switch only: `score_i = (φ_i · f)^2 / sum_j (φ_i · f)^2` using tracked columns. Excited when score >= 0.20 and frequency >= 1 Hz. A 0.2 Hz mode with all the force is not excited.
+
+Embedded supports are announced once as `embedded_quadratic`. They are not re-logged every step.
+
+Example, seed null, from `python -m compiler.m3_study`:
+
+- ratios 0, 0.01, 0, 0.015, 0 produce no events
+- ratio 0.05 then -0.05: normal `separated → point` at 0.01 s, tangential `separated → free`, then both return to `separated` at 0.02 s
+- ratio 0.05, 0.25, 0.05: normal `point → area → point`. The middle value 0.15 would have stayed `area` (release is 0.12); 0.05 is below that
+- same object id: normal `self_penetration`, physics `penalty_contact`
+- `mu = 0` and tangential speed 1 m/s: tangential `free`
+- `mu = 0.3`: speed 0 `sticking`, 5e-3 m/s `sliding`, 1.5e-3 m/s no event, speed 0 `sticking` again
+- modal force on the 10 Hz tracked mode: excited id `[1]`; the same force on a 0.2 Hz mode: excited `[]`
 
 ## M4 — 1D Young's modulus order-of-magnitude inversion (not started)
 
