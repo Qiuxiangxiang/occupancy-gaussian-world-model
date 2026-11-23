@@ -49,22 +49,29 @@ def run_closed_loop(observed_trajectory, gaussians, *, window_steps: int,
         else:
             report = invert(prefix, gaussians)
         window = {"window": k, "steps": steps,
-                  "E_est": report["E_est"],
                   "speed_est": report["speed_est"],
                   "objective": report["objective"],
                   "simulation_calls": report["simulation_calls"]}
-        for extra in ("mu_est", "optima_spread"):
+        for extra in ("E_est", "mu_est", "optima_spread"):
             if extra in report:
                 window[extra] = report[extra]
         windows.append(window)
         used = k
+        # Convergence variable: E when the report carries it (default
+        # entry point), otherwise mu (acoustic entry point) — recorded
+        # decision: the loop tracks whatever belief the estimator emits.
+        track = report.get("E_est", report.get("mu_est"))
+        if track is None:
+            failures.append("invert report carries neither E_est nor mu_est")
+            break
         if previous_E is not None:
-            change = abs(report["E_est"] - previous_E) / max(previous_E, 1e-30)
+            change = abs(track - previous_E) / max(previous_E, 1e-30)
             if change < stop_relative:
                 stopped_by = "estimate_converged"
                 break
-        previous_E = report["E_est"]
-    estimate = windows[-1]["E_est"]
+        previous_E = track
+    last = windows[-1]
+    estimate = last.get("E_est", last.get("mu_est"))
     if not windows:
         failures.append("no windows processed")
     return {"passed": not failures, "failures": failures,

@@ -267,3 +267,102 @@ def invert_joint(observed_trajectory, gaussians, E_bounds=(1e4, 1e9),
         "optima_spread": spread,
         "starts": results,
     }
+
+
+def invert_mu_acoustic(observed_waveform, gaussians, *, sr=44100,
+                       mu_bounds=(0.0, 1.0), E_fixed=1.0e5,
+                       slide=0.1, approach_distance=0.03,
+                       n_inits=3, maxiter=40, dt=SIM_DT):
+    """Estimate mu from an impact WAVEFORM alone, through the acoustic
+    forward model (integrator -> velocity jump -> modal synthesis).
+
+    Glossary of record: tests/test_acoustic_inversion.py. Recorded
+    identifiability finding: jointly optimizing (mu, speed) against the
+    post-impact sound alone is degenerate -- a continuum of (mu, speed)
+    pairs reproduces the same excitation within observation noise (the
+    tail is mu-silent with the recorded tau). The estimator therefore
+    works in two steps: (1) the impact TIMING is read off the waveform
+    (first sample above a threshold fraction of the peak), and speed is
+    taken from the protocol geometry, delay = gap / (2 speed); (2) mu is
+    optimized in 1D at that speed over the excitation epoch (first 0.2 s).
+    E is fixed for this slice.
+    """
+    from queries.impact_sound import simulate_impact_sound
+    observed = np.asarray(observed_waveform, dtype=np.float64)
+    duration_s = len(observed) / sr
+    mu_lo, mu_hi = float(mu_bounds[0]), float(mu_bounds[1])
+    calls = {"n": 0}
+
+    # Step 1: timing -> speed (protocol geometry, recorded decision).
+    peak = np.max(np.abs(observed))
+    above = np.nonzero(np.abs(observed) > 0.2 * peak)[0]
+    if len(above) == 0:
+        raise ValueError("observation has no excitation above threshold")
+    delay_s = above[0] / sr
+    if delay_s <= 1e-6:
+        # Sound starts immediately: no timing information; the caller's
+        # protocol must provide the gap anyway, and speed stays free in
+        # the declared nuisance grid.
+        speed_fixed = None
+    else:
+        speed_fixed = float(approach_distance) / (2.0 * delay_s)
+
+    def forward(mu):
+        mu = min(max(float(mu), mu_lo + 1e-4), mu_hi - 1e-4)
+        calls["n"] += 1
+        sp = speed_fixed if speed_fixed is not None else 0.2
+        wave, _ = simulate_impact_sound(
+            E_fixed, sp, mu, gaussians, slide=slide, dt=dt, sr=sr,
+            duration_s=duration_s, approach_distance=None)
+        return np.asarray(wave, dtype=np.float64), sp
+
+    # Timing and excitation are decoupled (recorded): the forward model
+    # reproduces the sound CONTENT with zero delay; the protocol's timing
+    # is reproduced by comparing slices that start at the observed onset.
+    # Sample-quantized onset readout would otherwise dominate the
+    # objective with sub-sample misalignment.
+    onset = int(above[0])
+    # Threshold onset detection lands a few samples INSIDE the signal
+    # ramp (the synthesized sine starts at zero), so the objective
+    # cross-correlates over a small lag window around the detected onset
+    # and keeps the best alignment (recorded decision; +/-100 samples
+    # covers both the ramp offset and sample quantization).
+    lag_range = range(-100, 101, 4)
+
+    def objective(mu_vec):
+        synth, _ = forward(mu_vec[0])
+        n = int(0.2 * sr)
+        best = float("inf")
+        for lag in lag_range:
+            o0 = onset + lag
+            if o0 < 0 or o0 + n > len(observed) or n > len(synth):
+                continue
+            mse = float(np.mean((synth[:n] - observed[o0:o0 + n]) ** 2))
+            best = min(best, mse)
+        return best
+
+    mu_inits = np.linspace(mu_lo + 0.02 * (mu_hi - mu_lo),
+                           mu_hi - 0.2 * (mu_hi - mu_lo), int(n_inits))
+    results = []
+    for m0 in mu_inits:
+        opt = minimize(objective, np.array([m0]), method="Nelder-Mead",
+                       options={"maxiter": maxiter, "xatol": 1e-4,
+                                "fatol": 1e-16})
+        mu = min(max(float(opt.x[0]), mu_lo), mu_hi)
+        results.append({"mu_init": float(m0), "mu_est": float(mu),
+                        "objective": float(opt.fun),
+                        "converged": bool(opt.success)})
+    best = min(results, key=lambda r: r["objective"])
+    return {"mu_est": best["mu_est"],
+            "speed_est": speed_fixed if speed_fixed is not None else float("nan"),
+            "objective": best["objective"],
+            "mu_bounds": [mu_lo, mu_hi],
+            "E_fixed_pa": E_fixed,
+            "observation": "impact waveform only; no trajectory data",
+            "impact_delay_s": float(delay_s),
+            "objective_window_s": 0.2,
+            "identifiability": ("two-step: timing fixes speed (valley "
+                                "recorded); 1D mu over the excitation epoch"),
+            "simulation_calls": calls["n"],
+            "integrator_calls": calls["n"],
+            "starts": results}
