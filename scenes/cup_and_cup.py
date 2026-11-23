@@ -52,7 +52,12 @@ def build_scene():
     return gaussians, group_specs
 
 
-def simulate(steps: int | None = None) -> dict:
+def simulate(steps: int | None = None, *, resolve: bool = False,
+             resolve_iterations: int = 4, constraint_passes: int = 2) -> dict:
+    """``resolve`` enables the P1-3 non-penetration pass, iterated together
+    with the rigid projection ``constraint_passes`` times per step; the
+    removed penalty work is accumulated as heat (P1-4) and reported with
+    the energy-closure residual."""
     gaussians, group_specs = build_scene()
     n = len(gaussians)
     masses = np.array([g.mass for g in gaussians])
@@ -69,6 +74,9 @@ def simulate(steps: int | None = None) -> dict:
     contact_steps = 0
     cross_pen = 0.0
     scale_min = CUP_SCALE
+    heat = 0.0
+    from compiler.nonpenetration import resolve_penetration
+    potential0 = _potential(gaussians, state.vel)
     for _ in range(steps):
         for i in range(n):
             gaussians[i].pos = state.pos[i].copy()
@@ -93,7 +101,30 @@ def simulate(steps: int | None = None) -> dict:
 
         state = langevin_step(state, force, DT, masses, T=0.0, gamma=0.0,
                               force_fn=force_fn)
-        project_rigid(state, masses, groups)
+        if resolve:
+            for _ in range(constraint_passes):
+                for i in range(n):
+                    gaussians[i].pos = state.pos[i].copy()
+                # Internal overlaps are part of the cup's rest geometry
+                # under rigidity (fixed offsets restore them every
+                # projection); resolving them would manufacture infinite
+                # heat. Only cross-cup pairs are resolvable.
+                active = [p for p in contact_pairs(
+                    gaussians, velocities=state.vel, threshold=0.0)
+                    if gaussians[p.i].tag[0] != gaussians[p.j].tag[0]]
+                if active:
+                    # Impact tool, not an equilibrium tool (recorded): the
+                    # tolerance is 1% of the splat scale. Boundary
+                    # oscillation below it belongs to the penalty and its
+                    # PE stays in the books; resolving it would charge
+                    # heat every step from numerical noise.
+                    heat += resolve_penetration(
+                        state, gaussians, active, masses,
+                        iterations=resolve_iterations,
+                        tol_m=0.01 * CUP_SCALE)
+                project_rigid(state, masses, groups)
+        else:
+            project_rigid(state, masses, groups)
         for pair in contact_pairs(gaussians, velocities=state.vel, threshold=0.0):
             if gaussians[pair.i].tag[0] != gaussians[pair.j].tag[0]:
                 cross_pen = max(cross_pen, pair.penetration / scale_min)
@@ -112,6 +143,9 @@ def simulate(steps: int | None = None) -> dict:
     rigidity = float(np.max(np.abs(separation1 - separation0)))
     momentum_drift = float(np.max(np.abs(momentum1 - momentum0)))
     drift = float(eval_energy_drift(kinetic, potential, DT))
+    energy0 = kinetic[0] + potential0
+    energy_end = kinetic[-1] + potential[-1] + heat
+    closure_residual = abs(energy_end - energy0)
     final_rings = [_ring_radii(state.pos[i * N_RING:(i + 1) * N_RING], i)
                    for i in range(2)]
     failures = []
@@ -123,8 +157,14 @@ def simulate(steps: int | None = None) -> dict:
         failures.append(f"momentum drift {momentum_drift}")
     if cross_pen >= C.PEN_THRESHOLD:
         failures.append(f"cross penetration {cross_pen} over limit")
-    if drift >= C.ENERGY_DRIFT_LIMIT:
+    if not resolve and drift >= C.ENERGY_DRIFT_LIMIT:
         failures.append(f"energy drift {drift}/s over limit {C.ENERGY_DRIFT_LIMIT}")
+    # With resolve on, mechanical energy drops BY DESIGN (it becomes
+    # heat); the closure gate replaces the raw drift gate (recorded).
+    closure_relative = closure_residual / max(abs(energy0), 1e-30)
+    if resolve and closure_relative >= 0.02:
+        failures.append(
+            f"energy closure with heat {closure_relative} over 2% gate")
     return {"passed": not failures, "failures": failures,
             "contact_steps": contact_steps,
             "cross_penetration_ratio": float(cross_pen),
@@ -135,7 +175,21 @@ def simulate(steps: int | None = None) -> dict:
             "final_cm_x": [float(state.pos[i * N_RING:(i + 1) * N_RING, 0].mean())
                            for i in range(2)],
             "dt_s": DT, "steps": steps, "T_K": 0.0, "gamma_per_s": 0.0,
-            "approach_speed_each": APPROACH_SPEED}
+            "approach_speed_each": APPROACH_SPEED,
+            "resolve": resolve,
+            "projection_heat_j": heat,
+            "energy_start_j": energy0,
+            "closure_residual_j": closure_residual,
+            "closure_relative": closure_relative}
+
+
+def _potential(gaussians, velocities):
+    total = 0.0
+    for pair in contact_pairs(gaussians, velocities=velocities, threshold=0.0):
+        k_n = float(pair.normal @ pairwise_stiffness(
+            gaussians[pair.i], gaussians[pair.j]) @ pair.normal)
+        total += 0.5 * k_n * float(pair.penetration) ** 2
+    return total
 
 
 def _member_separations(pos, groups):

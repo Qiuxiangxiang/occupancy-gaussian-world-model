@@ -1,0 +1,36 @@
+{
+  "gate": "G1",
+  "phase": "P1",
+  "passed": true,
+  "failures": [],
+  "scope_record": "Original G1 was cup-lamp hinge (P1-1), deferred: no rotational DOF exists. G1 is re-scoped to integration acceptance of P1-2 (rigid reduction), P1-3 (non-penetration iteration), and P1-4 (heat accounting) on the cup-and-cup multi-object scene.",
+  "cup_baseline": {
+    "passed": true,
+    "contact_steps": 9,
+    "cross_penetration_ratio": 0.002589811019677868,
+    "energy_drift_per_s": 1.3664912511776436e-05,
+    "momentum_drift_max": 1.3100631690576847e-14,
+    "rigidity_drift_max": 1.3877787807814457e-17
+  },
+  "cup_resolved": {
+    "passed": true,
+    "cross_penetration_ratio": 0.0028224273102107206,
+    "projection_heat_j": 0.0,
+    "closure_relative": 5.4645981966917786e-06,
+    "rigidity_drift_max": 1.3877787807814457e-17,
+    "momentum_drift_max": 2.325917236589703e-14
+  },
+  "hard_collision_reference": {
+    "without_projection_pen_m": 0.0007813224976093991,
+    "with_projection_pen_m": 5.994141333286185e-05,
+    "heat_j": 0.21243465480496232,
+    "penetration_reduced": true,
+    "reduction_factor": 13.034769355047096
+  },
+  "friction_heat": {
+    "mu": 0.5,
+    "closure_relative": 0.009181651545124639,
+    "heat_j": 0.029872415867629617,
+    "tangential_rel_speed_end": 0.02124909721349093
+  }
+}

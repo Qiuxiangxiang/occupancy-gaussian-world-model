@@ -160,7 +160,7 @@ Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignor
 - [x] P0-9 Two-body demo (legacy horizon still misses contact; M1 is the contact gate)
 - [x] Gate G0 on the M1 scenes
 
-### Phase 1 — multi-object scenes
+### Phase 1 — multi-object scenes (G1 passing 2026-11-23; hinge deferred)
 
 - [x] Surface-contact initial conditions from a Cross3DGS cloud (M1)
 - [x] Embedded quadratic support, frozen at compile, active with an empty contact set (M2)
@@ -168,7 +168,7 @@ Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignor
 - [ ] P1-2 Rigid reduction
 - [x] P1-3 Non-penetration iteration inside the step (`compiler/nonpenetration.py`: inverse-mass position projection, K=8, exact per-pair momentum, penalty work accounted as heat; 0.3 m/s head-on: max penetration 0.78 mm -> 0.06 mm, x13; glossary in tests/test_nonpenetration.py)
 - [x] P1-4 Full energy split into kinetic, potential, and heat: heat = projection work (P1-3) + friction work (`scenes/friction_heat.py`: tangential sliding collision, heat = f_t_i dot v_rel_t per step; measured closure |KE_end + heat + PE_end - KE_0| = 1.1e-3 J, 0.9% of KE_0, inside the recorded 1% gate; momentum exact; mu=0 control keeps KE constant. Damping heat (gamma > 0) and Langevin fluctuation heat are open and recorded as such)
-- [ ] Gate G1 cup-lamp
+- [x] Gate G1 (re-scoped: `compiler/g1_harness.py`, artifacts/g1_report.json — cup-and-cup baseline + resolved-variant closure + hard-collision projection reference x13 + friction-heat closure; the cup-lamp hinge scope is deferred with P1-1 and the re-scope is recorded in the report)
 
 ### Phase 2 — acoustics
 

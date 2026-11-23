@@ -29,7 +29,11 @@ def resolve_penetration(state, gaussians, pairs, masses,
         worst = 0.0
         for pair in active:
             pen = float(pair.penetration)
-            if pen <= 0.0:
+            # Pairs within tolerance are touching, not penetrating: no
+            # displacement and no heat. Charging them would manufacture
+            # heat every step at sustained contact (k_n is huge, so even
+            # boundary noise pen ~ 1e-7 m books real joules).
+            if pen <= tol_m:
                 continue
             i, j = pair.i, pair.j
             mi, mj = float(masses[i]), float(masses[j])
@@ -39,11 +43,13 @@ def resolve_penetration(state, gaussians, pairs, masses,
             # deepens the overlap. Separate: i backs along -n, j along +n.
             pos[i] -= pen * (mj / total) * n
             pos[j] += pen * (mi / total) * n
-            # Accounted heat: penalty force at the pair times the full
-            # displacement of the pair (share_i + share_j = pen).
+            # Accounted heat: work of the penalty force over the removal
+            # path. The force at penetration x is k*x; removing the
+            # overlap travels x from pen to 0, so the work (and the PE
+            # removed) is integral k*x dx = 0.5*k*pen^2.
             k_n = float(pair.normal @ pairwise_stiffness(
                 gaussians[i], gaussians[j]) @ pair.normal)
-            heat += k_n * pen * pen
+            heat += 0.5 * k_n * pen * pen
             worst = max(worst, pen)
         if worst <= tol_m:
             break
