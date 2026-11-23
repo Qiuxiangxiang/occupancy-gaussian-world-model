@@ -255,8 +255,12 @@ most 0.17 mm against a recorded 4 mm tolerance (5% of travel), contact
 occurs in both, mass is exact. Contact windows differ (40 vs 57 steps) —
 merged 1-sigma reach differs, which is expected geometry, not an error.
 
-Open: render-side decimation smoke (G5c) is scaffolded but not run against
-the 4090 in CI; run it manually when the render path is next exercised.
+G5c now runs against the 4090 (`python -m compiler.p5_harness --remote`):
+all five measured LOD levels render without error; pixel coverage goes
+1.0000 -> 0.9988 from 100k to 2.5k gaussians. The cloud fills the frame at
+this camera distance, so coverage saturates — the number is reported with
+that saturation noted, not gated on monotonicity.
+
 Rotation: none — ``OccupancyGaussian`` has no rotational DOF; rigid means
 rigid translation until that changes.
 

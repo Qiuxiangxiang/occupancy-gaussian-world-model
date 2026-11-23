@@ -150,7 +150,7 @@ python -m compiler.m3_study
 - [x] Budget policy with hysteresis as a pure function (`choose_level`); glossary of record in `tests/test_lod.py`
 - [x] G5 gate (`compiler/p5_harness.py`): merge invariants over a connected grid pyramid (mass exact, scales finite) + policy replay against the real M5 4090 latency ladder
 - [x] Recorded blocker: dynamics-level LOD needs P1-2 rigid reduction (no attractive bond in the integrator; compound bodies disintegrate)
-- [ ] Render-side decimation smoke against the 4090 (G5c), manual when the render path is next used
+- [x] Render-side decimation smoke (G5c): all 5 LOD levels render on the 4090, coverage 1.0000 -> 0.9988 (saturated at this camera distance, recorded); `python -m compiler.p5_harness --remote`
 - [x] P1-2 rigid reduction (`compiler/rigid.py`): post-step projection onto fixed cm offsets; momentum exact; internal KE removal recorded as the approximation; no rotational DOF
 - [x] Dynamics-level LOD equivalence (G5d): rigid fine vs moment-merged coarse, per-body cm deviation 0.17 mm vs recorded 4 mm tolerance, contact preserved both sides, mass exact
 - [ ] Rotational rigid dynamics — blocked on a rotational DOF existing

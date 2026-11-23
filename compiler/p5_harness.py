@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 
@@ -132,6 +133,75 @@ def _g5b(ladder: Ladder) -> dict:
             "loose_trace": trace_loose}
 
 
+REMOTE_PYTHON = "/data/Users/AO/eacomp/liuqinghua/m5/venv/bin/python"
+REMOTE_REPO = "/data/Users/AO/eacomp/liuqinghua/m5/repo"
+
+
+def _g5c(host: str = "ea-4090-ts") -> dict:
+    """Render-side LOD smoke on the 4090. Stride-decimated levels of the M5
+    cloud each render one frame; coverage is reported, rendering without
+    error and every level staying visible are gated."""
+    import subprocess
+    import tempfile
+    from compiler.m5_telemetry import RASTER_LEVELS, generate_cloud
+    ply = ROOT / "artifacts" / "m5_lod_input.ply"
+    if not ply.is_file():
+        generate_cloud(ply, 100_000, seed=0)
+    sync = subprocess.run(
+        ["rsync", "-az", "--exclude", ".git", "--exclude", "__pycache__",
+         "--exclude", ".pytest_cache", "-e", "ssh -o BatchMode=yes",
+         str(ROOT) + "/", f"{host}:{REMOTE_REPO}/"],
+        capture_output=True, text=True, timeout=600)
+    if sync.returncode != 0:
+        return {"passed": False,
+                "failures": [f"G5c rsync failed: {sync.stderr.strip()[:200]}"]}
+    remote_ply = f"{REMOTE_REPO}/artifacts/m5_lod_input.ply"
+    put = subprocess.run(["ssh", "-o", "BatchMode=yes", host,
+                          f"mkdir -p {REMOTE_REPO}/artifacts"],
+                         capture_output=True, text=True, timeout=60)
+    cp = subprocess.run(["scp", "-q", "-o", "BatchMode=yes", str(ply),
+                         f"{host}:{remote_ply}"],
+                        capture_output=True, text=True, timeout=600)
+    if cp.returncode != 0:
+        return {"passed": False,
+                "failures": [f"G5c ply upload failed: {cp.stderr.strip()[:200]}"]}
+    out = f"{REMOTE_REPO}/artifacts/p5_render_smoke.json"
+    cmd = (f"cd {REMOTE_REPO} && {REMOTE_PYTHON} scripts/p5_render_smoke.py "
+           f"--ply {remote_ply} --output {out} "
+           f"--levels {' '.join(str(v) for v in RASTER_LEVELS)}")
+    run = subprocess.run(["ssh", "-o", "BatchMode=yes", host, cmd],
+                         capture_output=True, text=True, timeout=1800)
+    if run.returncode != 0:
+        return {"passed": False,
+                "failures": [f"G5c remote render failed: {run.stderr.strip()[:300]}"]}
+    local = ROOT / "artifacts" / "p5_render_smoke.json"
+    fetch = subprocess.run(["scp", "-q", "-o", "BatchMode=yes",
+                            f"{host}:{out}", str(local)],
+                           capture_output=True, text=True, timeout=120)
+    if fetch.returncode != 0:
+        return {"passed": False,
+                "failures": ["G5c report fetch failed"]}
+    data = json.loads(local.read_text())
+    failures = []
+    rows = data.get("levels") or []
+    if [row["gaussians"] for row in rows] != RASTER_LEVELS:
+        failures.append(f"G5c rendered levels {[r['gaussians'] for r in rows]} "
+                        f"!= requested {RASTER_LEVELS}")
+    invisible = [row["gaussians"] for row in rows
+                 if row["coverage_nonblack_fraction"] <= 0.01]
+    if invisible:
+        failures.append(f"G5c levels with no visible coverage: {invisible}")
+    coverages = [row["coverage_nonblack_fraction"] for row in rows]
+    return {"passed": not failures, "failures": failures,
+            "gpu": data.get("gpu"),
+            "levels": rows,
+            "coverage_trace": coverages,
+            "monotonicity": ("recorded, not gated: coverage "
+                             + ("decreases with decimation"
+                                if coverages == sorted(coverages, reverse=True)
+                                else "is not monotone"))}
+
+
 def run_p5(artifact: Path = ARTIFACT, remote: bool = False) -> dict:
     g5a = _g5a()
     ladder = _m5_ladder()
@@ -139,9 +209,12 @@ def run_p5(artifact: Path = ARTIFACT, remote: bool = False) -> dict:
         "passed": False,
         "failures": ["G5b skipped: artifacts/m5_report.json missing or empty"],
     }
-    g5c = {"passed": True, "note": "render-side smoke not run (remote off); "
-                                    "stride decimation is rendering-only, no "
-                                    "dynamics claim"}
+    if remote:
+        g5c = _g5c()
+    else:
+        g5c = {"passed": True, "note": "render-side smoke not run (remote off); "
+                                       "stride decimation is rendering-only, no "
+                                       "dynamics claim"}
     g5d = _g5d()
     failures = g5a["failures"] + g5b["failures"] + g5d["failures"]
     report = {
@@ -288,5 +361,5 @@ def _g5d() -> dict:
 
 
 if __name__ == "__main__":
-    result = run_p5()
+    result = run_p5(remote="--remote" in sys.argv)
     raise SystemExit(0 if result["passed"] else 1)

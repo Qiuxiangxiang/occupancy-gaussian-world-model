@@ -75,7 +75,43 @@
   },
   "g5c_render_smoke": {
     "passed": true,
-    "note": "render-side smoke not run (remote off); stride decimation is rendering-only, no dynamics claim"
+    "failures": [],
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "levels": [
+      {
+        "gaussians": 100000,
+        "coverage_nonblack_fraction": 1.0,
+        "frame_value_max": 0.49995025992393494
+      },
+      {
+        "gaussians": 50000,
+        "coverage_nonblack_fraction": 1.0,
+        "frame_value_max": 0.49995025992393494
+      },
+      {
+        "gaussians": 25000,
+        "coverage_nonblack_fraction": 1.0,
+        "frame_value_max": 0.4999502897262573
+      },
+      {
+        "gaussians": 10000,
+        "coverage_nonblack_fraction": 1.0,
+        "frame_value_max": 0.49992531538009644
+      },
+      {
+        "gaussians": 2500,
+        "coverage_nonblack_fraction": 0.9988125,
+        "frame_value_max": 0.48894450068473816
+      }
+    ],
+    "coverage_trace": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.9988125
+    ],
+    "monotonicity": "recorded, not gated: coverage decreases with decimation"
   },
   "g5d_dynamics_lod_equivalence": {
     "passed": true,
