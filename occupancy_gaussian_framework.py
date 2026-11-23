@@ -154,22 +154,42 @@ class State:
 
 
 def langevin_step(state: State, forces: np.ndarray, dt: float,
-                  masses: np.ndarray, T: float, gamma: float) -> State:
-    """Velocity-Verlet Langevin with BAOAB-ish splitting.
-    forces: (N, 3) external + contact forces.
+                  masses: np.ndarray, T: float, gamma: float,
+                  force_fn=None) -> State:
+    """BAOAB Langevin step. Reduces to velocity Verlet when T = 0 and gamma = 0.
+
+    forces: (N, 3) evaluated at the pre-step positions.
+    force_fn: optional callable ``pos -> (N, 3)`` used for the second half-kick
+    at the updated positions. Position-dependent forces (springs, penalties)
+    need this. If omitted, the pre-step force is reused, which is exact only
+    when the force does not depend on position.
+
+    Thermal noise is drawn only when T > 0 and gamma > 0. Damping and noise do
+    not conserve mechanical energy; conservation checks must pass T = 0 and
+    gamma = 0 (and a non-dissipative force).
     """
-    N = state.pos.shape[0]
-    a = forces / masses[:, None]
-    v_half = state.vel + 0.5 * dt * a
-    pos_new = state.pos + dt * v_half
+    a = np.asarray(forces, dtype=float) / masses[:, None]
+    v = state.vel + 0.5 * dt * a
+    x = state.pos + 0.5 * dt * v
     c = np.exp(-gamma * dt)
-    if T > 0 and gamma > 0:
-        sigma = np.sqrt(C.KB * T / masses * (1 - c ** 2))[:, None]
-        noise = C.RNG.standard_normal((N, 3)) * sigma
+    if T > 0.0 and gamma > 0.0:
+        sigma = np.sqrt(C.KB * T / masses * (1.0 - c ** 2))[:, None]
+        noise = C.RNG.standard_normal(v.shape) * sigma
     else:
         noise = 0.0
-    v_new = c * v_half + noise
-    return State(pos_new, v_new)
+    v = c * v + noise
+    x = x + 0.5 * dt * v
+    if force_fn is None:
+        a2 = a
+    else:
+        f2 = np.asarray(force_fn(x), dtype=float)
+        if f2.shape != x.shape:
+            raise ValueError(
+                f"force_fn returned shape {f2.shape}, expected {x.shape}"
+            )
+        a2 = f2 / masses[:, None]
+    v = v + 0.5 * dt * a2
+    return State(x, v)
 
 
 # ---------------------------------------------------------------------------
@@ -184,27 +204,49 @@ class ContactPair:
     rel_vel: np.ndarray   # relative velocity vector
 
 
+def contact_between(gaussians: list[OccupancyGaussian], i: int, j: int,
+                    velocities: np.ndarray | None = None,
+                    threshold: float = C.PEN_THRESHOLD) -> ContactPair | None:
+    """Analytic 1-sigma contact test for one pair. Shared by all-pairs and
+    the incremental graph. ``None`` means the pair is not a contact.
+
+    Gaussian density has infinite support. This predicate does not integrate
+    the tails: contact requires the center distance to fall inside the
+    projected 1-sigma radii by more than ``threshold * min(r1, r2)``.
+    """
+    if j < i:
+        i, j = j, i
+    g1, g2 = gaussians[i], gaussians[j]
+    d = g2.pos - g1.pos
+    dist = np.linalg.norm(d) + 1e-12
+    r1 = np.sqrt(d @ g1.cov @ d) / dist   # projected radius
+    r2 = np.sqrt(d @ g2.cov @ d) / dist
+    pen = (r1 + r2) - dist
+    if pen > threshold * min(r1, r2):
+        n = d / dist
+        if velocities is not None:
+            rel = velocities[j] - velocities[i]
+        else:
+            rel = np.zeros(3)
+        return ContactPair(i, j, n, pen, rel)
+    return None
+
+
 def contact_pairs(gaussians: list[OccupancyGaussian],
                   velocities: np.ndarray | None = None,
                   threshold: float = C.PEN_THRESHOLD) -> list[ContactPair]:
-    """Generate contact pairs from gaussian proximity. velocities: (N, 3)."""
+    """All-pairs reference. The incremental graph does not call this.
+
+    Kept as the test oracle. Production steps use
+    ``compiler.contact_graph.IncrementalContactGraph``.
+    """
     pairs = []
-    N = len(gaussians)
-    for i in range(N):
-        for j in range(i + 1, N):
-            g1, g2 = gaussians[i], gaussians[j]
-            d = g2.pos - g1.pos
-            dist = np.linalg.norm(d) + 1e-12
-            r1 = np.sqrt(d @ g1.cov @ d) / dist   # projected radius
-            r2 = np.sqrt(d @ g2.cov @ d) / dist
-            pen = (r1 + r2) - dist
-            if pen > threshold * min(r1, r2):
-                n = d / dist
-                if velocities is not None:
-                    rel = velocities[j] - velocities[i]
-                else:
-                    rel = np.zeros(3)
-                pairs.append(ContactPair(i, j, n, pen, rel))
+    n = len(gaussians)
+    for i in range(n):
+        for j in range(i + 1, n):
+            pair = contact_between(gaussians, i, j, velocities, threshold)
+            if pair is not None:
+                pairs.append(pair)
     return pairs
 
 
@@ -272,9 +314,14 @@ def scene_harmonic_oscillator():
                           mass=m, tag="osc")
     state = State(pos=g.pos.copy()[None, :], vel=np.zeros((1, 3)))
     traj_pos, traj_ke, traj_pe = [], [], []
+
+    def spring(pos):
+        return -k * pos
+
     for step in range(2000):
-        f = -k * state.pos
-        state = langevin_step(state, f, C.DT, np.array([m]), T=0.0, gamma=1e-6)
+        f = spring(state.pos)
+        state = langevin_step(state, f, C.DT, np.array([m]), T=0.0, gamma=1e-6,
+                              force_fn=spring)
         traj_pos.append(state.pos[0].copy())
         traj_ke.append(0.5 * m * np.sum(state.vel ** 2))
         traj_pe.append(0.5 * k * np.sum(state.pos ** 2))
