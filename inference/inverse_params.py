@@ -189,3 +189,81 @@ def invert_friction(observed_trajectory, gaussians, mu_bounds=(0.0, 1.0),
         "parameterization": "mu clipped to bounds (interior epsilon 1e-4)",
         "starts": results,
     }
+
+
+def invert_joint(observed_trajectory, gaussians, E_bounds=(1e4, 1e9),
+                 mu_bounds=(0.0, 1.0), *, steps=None,
+                 speed_guess=(0.05, 0.2), n_inits=2, maxiter=60):
+    """Joint (log E, mu, speed) inversion through the real forward model.
+
+    Glossary of record: tests/test_joint_inversion.py. One objective sees
+    both signatures (bounce timing and tangential decay). Identifiability
+    is assessed, not assumed: the report carries per-start optima spread
+    as the conditioning evidence.
+    """
+    observed = np.asarray(observed_trajectory, dtype=np.float64)
+    if steps is None:
+        steps = observed.shape[0]
+    masses = np.array([g.mass for g in gaussians], dtype=np.float64)
+    log_bounds = (float(np.log(E_bounds[0])), float(np.log(E_bounds[1])))
+    mu_lo, mu_hi = float(mu_bounds[0]), float(mu_bounds[1])
+    calls = {"simulations": 0}
+
+    def forward(theta):
+        log_e, mu, speed = float(theta[0]), float(theta[1]), float(theta[2])
+        log_e = min(max(log_e, log_bounds[0]), log_bounds[1])
+        mu = min(max(mu, mu_lo + 1e-4), mu_hi - 1e-4)
+        speed = max(speed, 1e-6)
+        calls["simulations"] += 1
+        return simulate_bounce(np.exp(log_e), speed, gaussians, steps=steps,
+                               masses=masses, mu=mu)
+
+    def objective(theta):
+        traj = forward(theta)
+        diff = traj - observed
+        return float(np.mean(diff ** 2))
+
+    e_inits = np.linspace(log_bounds[0] + 0.3 * (log_bounds[1] - log_bounds[0]),
+                          log_bounds[1] - 0.3 * (log_bounds[1] - log_bounds[0]),
+                          int(n_inits))
+    mu_inits = np.linspace(mu_lo + 0.2 * (mu_hi - mu_lo),
+                           mu_hi - 0.2 * (mu_hi - mu_lo), int(n_inits))
+    starts = [(float(le), float(m), float(v0))
+              for le in e_inits for m in mu_inits for v0 in speed_guess]
+    results = []
+    for start in starts:
+        opt = minimize(objective, np.array(start), method="Nelder-Mead",
+                       options={"maxiter": maxiter, "xatol": 1e-3,
+                                "fatol": 1e-16})
+        log_e = min(max(float(opt.x[0]), log_bounds[0]), log_bounds[1])
+        mu = min(max(float(opt.x[1]), mu_lo), mu_hi)
+        results.append({
+            "E_init": float(np.exp(start[0])), "mu_init": float(start[1]),
+            "speed_init": float(start[2]),
+            "E_est": float(np.exp(log_e)), "mu_est": float(mu),
+            "speed_est": float(opt.x[2]),
+            "objective": float(opt.fun), "converged": bool(opt.success),
+        })
+    best = min(results, key=lambda r: r["objective"])
+    good = [r for r in results
+            if r["objective"] <= best["objective"] * 1.5 + 1e-20]
+    logE_vals = [float(np.log(r["E_est"])) for r in good]
+    mu_vals = [r["mu_est"] for r in good]
+    spread = {
+        "logE_std": float(np.std(logE_vals)) if len(logE_vals) > 1 else 0.0,
+        "mu_std": float(np.std(mu_vals)) if len(mu_vals) > 1 else 0.0,
+        "n_good_starts": len(good),
+        "n_starts": len(results),
+    }
+    return {
+        "E_est": best["E_est"],
+        "mu_est": best["mu_est"],
+        "speed_est": best["speed_est"],
+        "objective": best["objective"],
+        "E_bounds": [float(E_bounds[0]), float(E_bounds[1])],
+        "mu_bounds": [mu_lo, mu_hi],
+        "parameterization": "log E + bounded mu + speed; joint objective",
+        "simulation_calls": calls["simulations"],
+        "optima_spread": spread,
+        "starts": results,
+    }
