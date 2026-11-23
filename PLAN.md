@@ -167,7 +167,7 @@ Inria-style `nx, ny, nz` files are a different layout. Named extras can be ignor
 - [ ] P1-1 Cup + lamp hinge
 - [ ] P1-2 Rigid reduction
 - [x] P1-3 Non-penetration iteration inside the step (`compiler/nonpenetration.py`: inverse-mass position projection, K=8, exact per-pair momentum, penalty work accounted as heat; 0.3 m/s head-on: max penetration 0.78 mm -> 0.06 mm, x13; glossary in tests/test_nonpenetration.py)
-- [~] P1-4 Full energy split into kinetic, potential, and heat (heat from non-penetration projection landed with P1-3; friction and damping heat still open)
+- [x] P1-4 Full energy split into kinetic, potential, and heat: heat = projection work (P1-3) + friction work (`scenes/friction_heat.py`: tangential sliding collision, heat = f_t_i dot v_rel_t per step; measured closure |KE_end + heat + PE_end - KE_0| = 1.1e-3 J, 0.9% of KE_0, inside the recorded 1% gate; momentum exact; mu=0 control keeps KE constant. Damping heat (gamma > 0) and Langevin fluctuation heat are open and recorded as such)
 - [ ] Gate G1 cup-lamp
 
 ### Phase 2 — acoustics
